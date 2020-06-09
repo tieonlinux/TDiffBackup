@@ -31,10 +31,10 @@ def submodule_init(name: str, remote_url:str, cwd: OptionalPath='./', version='l
         cwd = './'
     cwd: Path = Path(cwd)
     
-    cmd = f'''git.exe submodule add  --force -- "{remote_url}" "{name}"'''
+    cmd = f'''git submodule add  --force -- "{remote_url}" "{name}"'''
     subprocess.check_call(shlex.split(cmd), cwd=str(cwd))
     if version != 'latest':
-        cmd = f"git.exe checkout -f {version} --"
+        cmd = f"git checkout -f {version} --"
         subprocess.check_call(shlex.split(cmd), cwd=str(cwd / name))
 
 
@@ -57,7 +57,7 @@ def submodule_rename_namespace(name: str, namespaces: Collection[str], cwd: Opti
             modified.add(path.relative_to(submodule))
     if modified:
         cmd = 'git update-index --assume-unchanged -- '
-        cmd += " ".join(map(lambda path: str(path).replace(os.sep, '/'), modified))
+        cmd += " ".join(map(lambda path: f'"{path}"', modified))
         subprocess.check_call(shlex.split(cmd), cwd=str(submodule))
     return modified
 

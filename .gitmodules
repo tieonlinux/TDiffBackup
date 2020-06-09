@@ -1,3 +1,6 @@
 [submodule "deltaq"]
 	path = deltaq
 	url = https://github.com/jzebedee/deltaq.git
+[submodule "HumanDateParser"]
+	path = HumanDateParser
+	url = https://github.com/ti-ka/human-date-parser.git

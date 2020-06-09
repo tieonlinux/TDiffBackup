@@ -26,18 +26,19 @@ def download_tshock(url=r"https://github.com/Pryaxis/TShock/releases/download/v4
             zf.extractall(dest)
 
 
-def submodule_init(cwd: OptionalPath='./', version='v1.1', name: str='deltaq'):
+def submodule_init(name: str, remote_url:str, cwd: OptionalPath='./', version='latest'):
     if cwd is None:
         cwd = './'
     cwd: Path = Path(cwd)
     
-    cmd = f'''git.exe submodule add  --force -- "https://github.com/jzebedee/deltaq.git" "{name}"'''
+    cmd = f'''git.exe submodule add  --force -- "{remote_url}" "{name}"'''
     subprocess.check_call(shlex.split(cmd), cwd=str(cwd))
     if version != 'latest':
         cmd = f"git.exe checkout -f {version} --"
         subprocess.check_call(shlex.split(cmd), cwd=str(cwd / name))
 
-def submodule_rename_namespace(namespaces: Collection[str] = ('deltaq', 'bz2core'), cwd: OptionalPath='./', name: str='deltaq', suffix: str='tie'):
+
+def submodule_rename_namespace(name: str, namespaces: Collection[str], cwd: OptionalPath='./', suffix: str='tie'):
     if cwd is None:
         cwd = './'
     cwd: Path = Path(cwd)
@@ -61,7 +62,15 @@ def submodule_rename_namespace(namespaces: Collection[str] = ('deltaq', 'bz2core
     return modified
 
 
+def deltaq_init(name: str='deltaq', remote_url="https://github.com/jzebedee/deltaq.git", version='v1.1', namespaces=('deltaq', 'bz2core')):
+    submodule_init(name=name, remote_url=remote_url, version=version)
+    submodule_rename_namespace(name=name, namespaces=namespaces)
+
+def human_date_parser_init(name: str='HumanDateParser', remote_url="https://github.com/ti-ka/human-date-parser.git", version='latest', namespaces=('HumanDateParser',)):
+    submodule_init(name=name, remote_url=remote_url, version=version)
+    submodule_rename_namespace(name=name, namespaces=namespaces)
+
 if __name__ == "__main__":
     download_tshock()
-    submodule_init()
-    submodule_rename_namespace()
+    deltaq_init()
+    human_date_parser_init()

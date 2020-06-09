@@ -1,10 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using deltaq_tie.BsDiff;
+using TShockAPI.Extensions;
 using ThreadState = System.Threading.ThreadState;
 
 #nullable enable
@@ -16,12 +20,17 @@ namespace DiffBackup
         Task StartBackup(string path, CancellationToken cancellationToken);
         void BackupSave(string path, CancellationToken cancellationToken);
         Task BackupSaveAsync(string path, CancellationToken cancellationToken);
+
+        List<DateTime> ListBackup(string path, CancellationToken cancellationToken);
+
+        bool Restore(string path, DateTime date, CancellationToken cancellationToken);
         void Dispose();
     }
 
     public class BackupService : IDisposable, IBackupService
     {
         public readonly ITlog Log;
+        private const string TimeFormat = "HH_mm_ss";
         private Stopwatch _saveDiffStopWatch = new Stopwatch();
         private readonly SemaphoreSlim _saveDiffSemaphore = new SemaphoreSlim(1, 1);
 
@@ -86,8 +95,8 @@ namespace DiffBackup
                 var now = DateTime.Now;
                 _saveDiffStopWatch = Stopwatch.StartNew();
                 var fileName = Path.GetFileName(path);
-                using var zip = await IoSchedule(() => ZipFile.Open(path + ".backup.zip", ZipArchiveMode.Update));
-                var folderName = now.ToString("yyyy_MM_dd");
+                using var zip = await IoSchedule(() => ZipFile.Open(GetArchiveFileName(path), ZipArchiveMode.Update));
+                var folderName = GetFolderName(now);
                 var diffSrcPath = folderName + "/" + fileName;
                 var oldEntry = zip.GetEntry(diffSrcPath);
                 if (oldEntry is null)
@@ -99,7 +108,7 @@ namespace DiffBackup
                 else
                 {
                     Log.LogDebug("Saving diff into zip " + path, TraceLevel.Info);
-                    var resultPath = $"{folderName}/{now:HH_mm_ss}.bsdiff";
+                    var resultPath = $"{folderName}/{now.ToString(TimeFormat, CultureInfo.InvariantCulture)}.bsdiff";
                     await IoScheduleAction(() => CreateDiff(path, zip, oldEntry, resultPath, tokenSource.Token));
                     Log.LogInfo("Saved new world diff");
                 }
@@ -108,6 +117,18 @@ namespace DiffBackup
             {
                 _saveDiffSemaphore.Release();
             }
+        }
+
+        private const string DateFormat = "yyyy_MM_dd";
+
+        private static string GetFolderName(DateTime date)
+        {
+            return date.ToString(DateFormat);
+        }
+
+        private static string GetArchiveFileName(string path)
+        {
+            return path + ".backup.zip";
         }
 
         private void CreateDiff(string path, ZipArchive zip, ZipArchiveEntry oldEntry, string resultPath,
@@ -139,6 +160,96 @@ namespace DiffBackup
             _ioStop.Token.ThrowIfCancellationRequested();
             BsDiff.Create(oldFileContent, content, ms);
             return ms.ToArray();
+        }
+
+
+        public List<DateTime> ListBackup(string path, CancellationToken cancellationToken)
+        {
+            IEnumerable<DateTime> ListDate()
+            {
+                using var zip = ZipFile.Open(GetArchiveFileName(path), ZipArchiveMode.Read);
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var entry in zip.Entries)
+                {
+                    var date = GetDateTime(entry);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return date;
+                }
+            }
+
+            try
+            {
+                return ListDate().ToList();
+            }
+            catch (FileNotFoundException)
+            {
+                return new List<DateTime>();
+            }
+            
+        }
+
+        private DateTime GetDateTime(ZipArchiveEntry entry)
+        {
+            var fname = Path.GetFileName(entry.Name);
+            var dir = Path.GetDirectoryName(entry.FullName);
+            DateTime date;
+
+            try
+            {
+                var time = DateTime.ParseExact(fname.Substring(0, TimeFormat.Length), TimeFormat,
+                    CultureInfo.InvariantCulture);
+                date = DateTime.ParseExact(dir.Trim('/', '\\'), DateFormat, CultureInfo.InvariantCulture);
+                date = new DateTime(date.Year, date.Month, date.Day, time.Hour, time.Minute, time.Second);
+            }
+            catch (FormatException)
+            {
+                date = entry.LastWriteTime.DateTime;
+            }
+
+            return date;
+        }
+
+
+        public bool Restore(string path, DateTime date, CancellationToken cancellationToken)
+        {
+            using var zip = ZipFile.Open(GetArchiveFileName(path), ZipArchiveMode.Read);
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = zip.Entries.First(e => Math.Abs((GetDateTime(e) - date).TotalSeconds) <= 1);
+            if (Path.GetFileName(entry.FullName) == Path.GetFileName(path))
+            {
+                // just extract and we're done
+                using var zs = entry.Open();
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
+                zs.CopyTo(fs);
+                return true;
+            }
+            else
+            {
+                byte[] diffBuff;
+                {
+                    using var zs = entry.Open();
+                    using var diff = new MemoryStream();
+                    zs.CopyTo(diff);
+                    diffBuff = diff.ToArray();
+                }
+
+                byte[] srcBuff;
+                {
+                    using var src = new MemoryStream();
+                    var srcPath = GetFolderName(date) + "/" + Path.GetFileName(path);
+                    Log.LogDebug($"{nameof(BackupService)} Opening {srcPath} as src file for diff");
+                    var srcEntry = zip.GetEntry(srcPath);
+                    using var scrEntry = srcEntry!.Open();
+                    scrEntry.CopyTo(src);
+                    srcBuff = src.ToArray();
+                }
+
+                using var buff = new MemoryStream();
+                BsPatch.Apply(srcBuff, diffBuff, buff);
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
+                buff.CopyTo(fs);
+                return true;
+            }
         }
 
 
@@ -201,9 +312,8 @@ namespace DiffBackup
                 {
                     _ioEvent.Wait(_ioStop.Token);
                 }
-                catch (OperationCanceledException ex)
+                catch (OperationCanceledException)
                 {
-                    Log.LogDebug(ex.StackTrace, TraceLevel.Error);
                     if (_ioStop.IsCancellationRequested) break;
                     throw;
                 }
@@ -219,10 +329,14 @@ namespace DiffBackup
         {
             Log.LogDebug($"{nameof(BackupService)} Dispose");
             _ioStop.Cancel(false);
-            if (!_ioThread.Join(5000))
+            if (_ioThread.IsAlive)
             {
-                _ioThread.Abort();
+                if (!_ioThread.Join(5000))
+                {
+                    _ioThread.Abort();
+                }
             }
+
 
             _ioEvent.Dispose();
             _saveDiffSemaphore.Dispose();

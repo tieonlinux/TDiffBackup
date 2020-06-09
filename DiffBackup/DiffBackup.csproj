@@ -83,6 +83,36 @@
         <Compile Include="..\deltaq\deltaq\SuffixSort\SAIS.cs">
           <Link>deltaq\SuffixSort\SAIS.cs</Link>
         </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\CharacterBuffer.cs">
+          <Link>HumanDateParser\CharacterBuffer.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\DateParser.cs">
+          <Link>HumanDateParser\DateParser.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\DateRange.cs">
+          <Link>HumanDateParser\DateRange.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\DateTimeExtentions.cs">
+          <Link>HumanDateParser\DateTimeExtentions.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\ICharacterBuffer.cs">
+          <Link>HumanDateParser\ICharacterBuffer.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\Lexer.cs">
+          <Link>HumanDateParser\Lexer.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\Parser.cs">
+          <Link>HumanDateParser\Parser.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\Token.cs">
+          <Link>HumanDateParser\Token.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\TokenBuffer.cs">
+          <Link>HumanDateParser\TokenBuffer.cs</Link>
+        </Compile>
+        <Compile Include="..\HumanDateParser\HumanDateParser\TokenKind.cs">
+          <Link>HumanDateParser\TokenKind.cs</Link>
+        </Compile>
         <Compile Include="BackupService.cs" />
         <Compile Include="TLog.cs" />
         <Compile Include="TdiffPlugin.cs" />

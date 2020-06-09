@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <ProjectGuid>{4D7FEECB-2252-41BB-921D-D431EB8A4506}</ProjectGuid>
+        <OutputType>Library</OutputType>
+        <AppDesignerFolder>Properties</AppDesignerFolder>
+        <RootNamespace>DiffBackup</RootNamespace>
+        <AssemblyName>DiffBackup</AssemblyName>
+        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+        <FileAlignment>512</FileAlignment>
+        <LangVersion>8</LangVersion>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>full</DebugType>
+        <Optimize>false</Optimize>
+        <OutputPath>bin\Debug\</OutputPath>
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugType>pdbonly</DebugType>
+        <Optimize>true</Optimize>
+        <OutputPath>bin\Release\</OutputPath>
+        <DefineConstants>TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <ItemGroup>
+        <Reference Include="OTAPI, Version=1.4.0.5, Culture=neutral, PublicKeyToken=null">
+          <HintPath>..\TShock\OTAPI.dll</HintPath>
+        </Reference>
+        <Reference Include="System" />
+        <Reference Include="System.Core" />
+        <Reference Include="System.Data" />
+        <Reference Include="System.IO.Compression" />
+        <Reference Include="System.IO.Compression.FileSystem" />
+        <Reference Include="System.Xml" />
+        <Reference Include="TerrariaServer, Version=1.4.0.5, Culture=neutral, PublicKeyToken=null">
+          <HintPath>..\TShock\TerrariaServer.exe</HintPath>
+        </Reference>
+        <Reference Include="TShockAPI, Version=4.4.0.0, Culture=neutral, PublicKeyToken=null">
+          <HintPath>..\TShock\ServerPlugins\TShockAPI.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="..\deltaq\deltaq\BsDiff\BsDiff.cs">
+          <Link>deltaq\BsDiff\BsDiff.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\BsDiff\BsPatch.cs">
+          <Link>deltaq\BsDiff\BsPatch.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\BZip2Constants.cs">
+          <Link>deltaq\Bzip2\BZip2Constants.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\BZip2Exception.cs">
+          <Link>deltaq\Bzip2\BZip2Exception.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\BZip2InputStream.cs">
+          <Link>deltaq\Bzip2\BZip2InputStream.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\BZip2OutputStream.cs">
+          <Link>deltaq\Bzip2\BZip2OutputStream.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\Checksums\IChecksum.cs">
+          <Link>deltaq\Bzip2\Checksums\IChecksum.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Bzip2\Checksums\StrangeCrc.cs">
+          <Link>deltaq\Bzip2\Checksums\StrangeCrc.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\Extensions.cs">
+          <Link>deltaq\Extensions.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\SuffixSort\ISuffixSort.cs">
+          <Link>deltaq\SuffixSort\ISuffixSort.cs</Link>
+        </Compile>
+        <Compile Include="..\deltaq\deltaq\SuffixSort\SAIS.cs">
+          <Link>deltaq\SuffixSort\SAIS.cs</Link>
+        </Compile>
+        <Compile Include="BackupService.cs" />
+        <Compile Include="TLog.cs" />
+        <Compile Include="TdiffPlugin.cs" />
+        <Compile Include="Properties\AssemblyInfo.cs" />
+    </ItemGroup>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+    <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+         Other similar extension points exist, see Microsoft.Common.targets.
+    <Target Name="BeforeBuild">
+    </Target>
+    <Target Name="AfterBuild">
+    </Target>
+    -->
+
+</Project>

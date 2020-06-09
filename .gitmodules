@@ -1,0 +1,3 @@
+[submodule "deltaq"]
+	path = deltaq
+	url = https://github.com/jzebedee/deltaq.git

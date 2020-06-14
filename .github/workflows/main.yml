@@ -48,8 +48,12 @@ jobs:
       run: dotnet restore
       timeout-minutes: 5
     
-    - name: Build
+    - name: Build Release
       run: MsBuild TDiffBackup.sln /t:Build /p:Configuration=Release
+      timeout-minutes: 5
+
+    - name: Build Debug
+      run: MsBuild TDiffBackup.sln /t:Build /p:Configuration=Debug
       timeout-minutes: 5
 
     - name: Test using netcore
@@ -64,3 +68,13 @@ jobs:
       run: python tests.py
       timeout-minutes: 20
      
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Release Build
+        path: DiffBackup/bin/Release/DiffBackup.*
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Debug Build
+        path: DiffBackup/bin/Debug/DiffBackup.*

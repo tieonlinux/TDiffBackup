@@ -113,7 +113,14 @@
         <Compile Include="..\HumanDateParser\HumanDateParser\TokenKind.cs">
           <Link>HumanDateParser\TokenKind.cs</Link>
         </Compile>
-        <Compile Include="BackupService.cs" />
+        <Compile Include="Backup\BackupIOWorker.cs" />
+        <Compile Include="Backup\BackupRepository.cs" />
+        <Compile Include="Backup\BackupRepositoryEntry.cs" />
+        <Compile Include="Backup\BackupService.cs" />
+        <Compile Include="Backup\BackupStrategy.cs" />
+        <Compile Include="Backup\BackupUtils.cs" />
+        <Compile Include="Backup\IBackupService.cs" />
+        <Compile Include="Backup\IBackupStrategy.cs" />
         <Compile Include="TLog.cs" />
         <Compile Include="TdiffPlugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />

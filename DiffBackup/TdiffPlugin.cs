@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using deltaq_tie.BsDiff;
+using DiffBackup.Backup;
 using HumanDateParser_tie;
 using Microsoft.Xna.Framework;
 using Terraria;
@@ -163,7 +164,7 @@ namespace DiffBackup
             {
                 TryParseDate(out date, shift: 1);
                 
-                ListAndDisplayBackups(args, date, ListAndSortBackupDatetime());
+                DisplayBackups(args, date, ListAndSortBackupDatetime());
                 return;
             }
 
@@ -226,7 +227,7 @@ namespace DiffBackup
             }
         }
 
-        private bool ListAndDisplayBackups(CommandArgs args, DateTime date, List<DateTime> dates)
+        private static bool DisplayBackups(CommandArgs args, DateTime date, List<DateTime> dates)
         {
             if (!dates.Any())
             {
@@ -278,7 +279,8 @@ namespace DiffBackup
             var debounceDelay = TimeSpan.FromSeconds(5);
             var precisionCorrection = TimeSpan.FromSeconds(1.0 / 30);
             _lastWriteStopwatch = Stopwatch.StartNew();
-
+            var now = DateTime.Now;
+            
             async Task RecheckLaterAsync()
             {
                 await Task.Delay(debounceDelay);
@@ -300,7 +302,7 @@ namespace DiffBackup
                     return;
                 }
 
-                await _backupService.StartBackup(e.FullPath, CancellationToken.None);
+                await _backupService.StartBackup(e.FullPath, now);
             }
 
             Task.Factory.StartNew(async () => await RecheckLaterAsync());

@@ -27,22 +27,33 @@ jobs:
     - name: update submodules' tags
       run: git submodule foreach --recursive 'git fetch --tags'
       
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.0
+    - uses: microsoft/setup-msbuild@v1.0.0
       with:
         vs-version: 16.5
+
+    - uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x' # SDK Version to use; x will use the latest version of the 3.1 channel
     
     - uses: actions/setup-python@v2
       with:
         python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
     
     
-    - name: bootstrap
+    - name: Bootstrap
       run: python bootstrap.py
       timeout-minutes: 3
+
+    - name: Restore using netcore
+      run: dotnet restore
+      timeout-minutes: 5
     
-    - name: build
+    - name: Build
       run: MsBuild TDiffBackup.sln /t:Build /p:Configuration=Release
+      timeout-minutes: 5
+
+    - name: Test using netcore
+      run: dotnet test
       timeout-minutes: 5
     
     - name: Install python deps

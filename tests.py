@@ -77,6 +77,7 @@ def setup_tshock(world_path: Path, dest: OptionalPath=None):
         dest = "./TShock"
     dest: Path = Path(dest)
     start = time.monotonic()
+    os.environ["TdiffOverwriteThrottleTimeSpan"] = "-1"
     if not Path(dest, "tshock", "config.json").exists():
         p: subprocess.Popen = subprocess.Popen(str(Path(dest, "TerrariaServer.exe").absolute()), cwd=dest, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
         pbuff = PopenBuffer(p)
@@ -108,7 +109,7 @@ def setup_tshock(world_path: Path, dest: OptionalPath=None):
     shutil.copy2("DiffBackup/bin/Release/DiffBackup.dll", dest / "ServerPlugins")
     cmd = f'\"{(dest / "TerrariaServer.exe").absolute()}\" -ip 127.0.0.1 -port 17778 --stats-optout -world \"{world_path.absolute()}\"'
     stdout = subprocess.PIPE
-    p = subprocess.Popen(shlex.split(cmd), bufsize=2**21, cwd=dest, stdout=stdout, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
+    p = subprocess.Popen(shlex.split(cmd), bufsize=2**21, cwd=dest, stdout=stdout, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, env=os.environ.copy())
     pbuff = PopenBuffer(p)
     while b"Server started" not in pbuff.read():
         time.sleep(1)
@@ -139,13 +140,13 @@ class IntegrationTest(unittest.TestCase):
         self.server_process.wait(15)
         self.tmp_dir.cleanup()
         self.pbuff.stop()
-        if self.backup_path.exists():
-            self.backup_path.unlink()
+        if self.backup_path.is_dir():
+            shutil.rmtree(self.backup_path)
 
     
     @property
     def backup_path(self) -> Path:
-        return Path(str(self.world_path) + ".backup.zip")
+        return Path(str(self.world_path) + ".backups")
 
 
     def wait_for_ouput(self, pattern: Union[bytes, Callable, re.Pattern], timeout=None, buff=b"", clear=True) -> bytes:
@@ -180,34 +181,32 @@ class IntegrationTest(unittest.TestCase):
         self.assertFalse(self.backup_path.exists())
         self.save_world_file()
         time.sleep(10)
-        self.assertTrue(self.backup_path.exists())
-        with zipfile.ZipFile(self.backup_path, "r") as zf:
-            names = zf.namelist()
-            self.assertEqual(len(names), 1)
-            zb = zf.read(names[0])
-            b = self.world_path.read_bytes()
-            self.assertEqual(zb, b)
+        self.assertTrue(self.backup_path.is_dir())
+        names = list(p for p in self.backup_path.glob("**/*") if p.is_file())
+        self.assertEqual(1, len(names))
+        zb = names[0].read_bytes()
+        b = self.world_path.read_bytes()
+        self.assertEqual(b, zb)
 
     def test_save_twice(self):
         self.assertFalse(self.backup_path.exists())
         self.save_world_file()
-        time.sleep(10)
+        time.sleep(30)
         self.assertTrue(self.backup_path.exists())
-        time.sleep(timedelta(minutes=3).total_seconds()) # FIXME this is sub optimal
+        time.sleep(timedelta(minutes=1).total_seconds()) # this is sub optimal
         self.save_world_file()
-        time.sleep(10)
-        self.assertTrue(self.backup_path.exists())
-        with zipfile.ZipFile(self.backup_path, "r") as zf:
-            names = zf.namelist()
-            self.assertEqual(len(names), 2)
-            src_file_path, diff_file_path = sorted(names, key=lambda s: s.endswith('.bsdiff'))
-            self.assertTrue(src_file_path.endswith(self.world_path.name))
-            self.assertTrue(diff_file_path.endswith('.bsdiff'), f"{diff_file_path} not endswith('.bsdiff')")
-            src = zf.read(src_file_path)
-            diff = zf.read(diff_file_path)
-            rebuild = bsdiff4.patch(src, diff)
-            b = self.world_path.read_bytes()
-            self.assertEqual(rebuild, b)
+        time.sleep(30)
+        self.assertTrue(self.backup_path.is_dir())
+        names = list(p for p in self.backup_path.glob("**/*") if p.is_file())
+        self.assertEqual(len(names), 2)
+        src_file_path, diff_file_path = sorted(names, key=lambda s: s.suffix == '.diff')
+        self.assertTrue(str(src_file_path).endswith(Path(self.world_path.name).suffix), f"{src_file_path} not ends with {Path(self.world_path.name).suffix}")
+        self.assertTrue(str(diff_file_path).endswith('.diff'), f"{diff_file_path} not endswith('.diff')")
+        src = src_file_path.read_bytes()
+        diff = diff_file_path.read_bytes()
+        rebuild = bsdiff4.patch(src, diff)
+        b = self.world_path.read_bytes()
+        self.assertEqual(rebuild, b)
     
 
 

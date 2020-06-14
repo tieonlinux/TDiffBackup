@@ -35,7 +35,9 @@ def submodule_init(name: str, remote_url:str, cwd: OptionalPath='./', version='l
     subprocess.check_call(shlex.split(cmd), cwd=str(cwd))
     if version != 'latest':
         cmd = f"git checkout -f {version} --"
-        subprocess.check_call(shlex.split(cmd), cwd=str(cwd / name))
+    else:
+        cmd = f"git reset --hard origin/master --"
+    subprocess.check_call(shlex.split(cmd), cwd=str(cwd / name))
 
 
 def submodule_rename_namespace(name: str, namespaces: Collection[str], cwd: OptionalPath='./', suffix: str='tie'):

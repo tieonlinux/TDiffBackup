@@ -10,6 +10,7 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -19,18 +20,33 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+
+    - name: Extract tag name
+      id: tag
+      uses: actions/github-script@0.2.0
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          return context.payload.ref.replace(/\/refs\/tags\//, '');
+    - name: Echo tag
+      run: echo ${{ steps.tag.outputs.result }}
+
+
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
       with:
         submodules: 'recursive'
         
-    - name: Update submodules' tags
+    - name: update submodules' tags
       run: git submodule foreach --recursive 'git fetch --tags'
       
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.0
+    - uses: microsoft/setup-msbuild@v1.0.0
       with:
         vs-version: 16.5
+
+    - uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x' # SDK Version to use; x will use the latest version of the 3.1 channel
     
     - uses: actions/setup-python@v2
       with:
@@ -39,9 +55,36 @@ jobs:
     
     - name: Bootstrap
       run: python bootstrap.py
+      timeout-minutes: 3
+
+    - name: Prepare Release
+      run: python prepare_release.py ${{ steps.tag.outputs.result }}
+
+    - name: Restore using netcore
+      run: dotnet restore
+      timeout-minutes: 5
     
-    - name: Build Release using MsBuild
+    - name: Build Release
       run: MsBuild TDiffBackup.sln /t:Build /p:Configuration=Release
+      timeout-minutes: 5
+
+    - name: Test using netcore
+      run: dotnet test
+      timeout-minutes: 5
+    
+    - name: Install python deps
+      run: python -m pip install --user requests bsdiff4
+      timeout-minutes: 5
+      
+    - name: Run integration python test script
+      run: python tests.py
+      timeout-minutes: 20
+     
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Release Build
+        path: DiffBackup/bin/Release/DiffBackup.*
     
     - name: Create Release
       id: create_release
@@ -53,6 +96,7 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: true
         prerelease: false
+        
     - name: Upload Release Asset
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1

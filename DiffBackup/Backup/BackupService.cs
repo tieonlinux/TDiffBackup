@@ -116,7 +116,7 @@ namespace DiffBackup.Backup
                 {
                     var referenceFileName = BackupUtils.ParseReferenceFileName(oldEntry.Name);
                     Log.LogDebug("Saving diff into repo " + path);
-                    var resultPath = $"{folderName}/{BackupUtils.FormatDiffFileName(now, referenceFileName)}";
+                    var resultPath = $"{folderName}/{BackupUtils.FormatDiffFileName(now, referenceFileName.referenceHash)}";
                     await IoScheduleAction(() => CreateDiff(path, repo, oldEntry, resultPath, now, tokenSource.Token));
                     Log.LogInfo("Saved new world diff");
                 }

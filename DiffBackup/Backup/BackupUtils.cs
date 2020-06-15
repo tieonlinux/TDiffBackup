@@ -15,38 +15,32 @@ namespace DiffBackup.Backup
         public const string TimeFormat = "HH_mm_ss";
         public const string DiffFileExtension = ".diff";
         public const string WorldFileExtension = ".wld";
-        
-        public static string FormatDiffFileName(DateTime dateTime, string referenceHash)
+
+        private static string FormatFileName(DateTime dateTime, string referenceHash, string extension)
         {
-            return $"{dateTime.ToString(TimeFormat)}_{referenceHash}{DiffFileExtension}";
+            return $"{dateTime.ToString(TimeFormat)}_{referenceHash}{extension}";
         }
 
-        public static (DateTime dateTime, string referenceHash) ParseDiffFileName(string fileName)
+        public static string FormatDiffFileName(DateTime dateTime, string referenceHash) =>
+            FormatFileName(dateTime, referenceHash, DiffFileExtension);
+
+        public static string FormatWorldFileName(DateTime dateTime, string referenceHash) => FormatFileName(dateTime, referenceHash, WorldFileExtension);
+
+        private static (DateTime dateTime, string referenceHash) ParseFileName(string fileName, string extension)
         {
             var regex = new Regex(@"^(\w+)_(\w+)(\.\w+)$");
             var match = regex.Match(Path.GetFileName(fileName));
-            if (match.Success && match.Groups[3].Value == DiffFileExtension)
+            if (match.Success && match.Groups[3].Value == extension)
             {
                 return (DateTime.ParseExact(match.Groups[1].Value, TimeFormat, CultureInfo.InvariantCulture), match.Groups[2].Value);
             }
-            throw new FormatException("Not a valid diff file name");
+            throw new FormatException($"Not a valid {extension} file name");
         }
-        
-        public static string ParseReferenceFileName(string fileName)
-        {
-            var regex = new Regex(@"^(\w+)(\.\w+)$");
-            var match = regex.Match(Path.GetFileName(fileName));
-            if (match.Success && match.Groups[2].Value == WorldFileExtension)
-            {
-                return match.Groups[1].Value;
-            }
-            throw new FormatException("Not a valid reference file name");
-        }
-        
-        public static string FormatWorldFileName(DateTime dateTime, string reference)
-        {
-            return $"{reference}{WorldFileExtension}";
-        }
+
+        public static (DateTime dateTime, string referenceHash) ParseDiffFileName(string fileName) =>
+            ParseFileName(fileName, DiffFileExtension);
+
+        public static (DateTime dateTime, string referenceHash) ParseReferenceFileName(string fileName) => ParseFileName(fileName, WorldFileExtension);
 
         public static string GetRepoSubFolderNameForDate(DateTime date)
         {
@@ -133,7 +127,7 @@ namespace DiffBackup.Backup
                 if (!IsWorldFilePath(entry.FullName)) continue;
                 var refName = ParseReferenceFileName(entry.Name);
                 var refEntry = new BackupEntry(entry, dt);
-                referencePool[refName] = refEntry;
+                referencePool[refName.referenceHash] = refEntry;
                 yield return refEntry;
             }
 

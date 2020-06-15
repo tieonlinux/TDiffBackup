@@ -25,6 +25,7 @@ namespace DiffBackup
     public class DiffBackupPlugin : TerrariaPlugin
     {
         public const string Command = "tdiff";
+
         /// <summary>
         /// Gets the author(s) of this plugin
         /// </summary>
@@ -52,9 +53,9 @@ namespace DiffBackup
 
         private readonly FileSystemWatcher _watcher = new FileSystemWatcher {IncludeSubdirectories = false};
         private Stopwatch _lastWriteStopwatch = new Stopwatch();
-        
-        private DateTime? prevRestoreDate  = null;
-        private Stopwatch prevRestoreStopwatch  = new Stopwatch();
+
+        private DateTime? prevRestoreDate = null;
+        private Stopwatch prevRestoreStopwatch = new Stopwatch();
 
         #endregion
 
@@ -153,23 +154,24 @@ namespace DiffBackup
             List<DateTime> ListAndSortBackupDatetime()
             {
                 var res = _backupService.ListBackup(Main.worldPathName, CancellationToken.None);
-            
+
                 res.Sort((left, right) =>
                     (int) (Math.Abs((left - date).TotalSeconds) - Math.Abs((right - date).TotalSeconds)));
 
                 return res;
             }
-            
-            if (args.Parameters[0].ToLowerInvariant() == "ls" || args.Parameters[0].ToLowerInvariant() == "list")
-            {
-                TryParseDate(out date, shift: 1);
-                
-                DisplayBackups(args, date, ListAndSortBackupDatetime());
-                return;
-            }
 
             if (args.Parameters.Count > 0)
             {
+                if (args.Parameters[0].ToLowerInvariant() == "ls" || args.Parameters[0].ToLowerInvariant() == "list")
+                {
+                    TryParseDate(out date, shift: 1);
+
+                    DisplayBackups(args, date, ListAndSortBackupDatetime());
+                    return;
+                }
+
+
                 if (args.Parameters[0].ToLowerInvariant() == "confirm")
                 {
                     if (prevRestoreDate is null || !prevRestoreStopwatch.IsRunning)
@@ -192,7 +194,6 @@ namespace DiffBackup
                     args.Player.SendErrorMessage("Unable to parse date");
                     return;
                 }
-                
             }
 
             var dates = ListAndSortBackupDatetime();
@@ -215,14 +216,15 @@ namespace DiffBackup
                     this.LogDebug(e.BuildExceptionString(), TraceLevel.Error);
                     throw;
                 }
-                
+
                 TShock.Utils.StopServer(false, "Restoring backup");
             }
             else
             {
-                args.Player.SendWarningMessage($"In order to restore backup @ {dates[0]}, you need to enter /{Command} confirm");
-                prevRestoreDate  = dates[0]; 
-                prevRestoreStopwatch  = Stopwatch.StartNew();
+                args.Player.SendWarningMessage(
+                    $"In order to restore backup @ {dates[0]}, you need to enter /{Command} confirm");
+                prevRestoreDate = dates[0];
+                prevRestoreStopwatch = Stopwatch.StartNew();
                 return;
             }
         }
@@ -234,6 +236,7 @@ namespace DiffBackup
                 args.Player.SendErrorMessage("no backup for now");
                 return false;
             }
+
             dates = dates.GetRange(0, Math.Min(24, dates.Count));
             dates.Sort();
             var i = 0;
@@ -280,7 +283,7 @@ namespace DiffBackup
             var precisionCorrection = TimeSpan.FromSeconds(1.0 / 30);
             _lastWriteStopwatch = Stopwatch.StartNew();
             var now = DateTime.Now;
-            
+
             async Task RecheckLaterAsync()
             {
                 await Task.Delay(debounceDelay);

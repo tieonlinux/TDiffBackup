@@ -24,6 +24,9 @@ namespace DiffBackup
     [ApiVersion(2, 1)]
     public class DiffBackupPlugin : TerrariaPlugin
     {
+
+        public readonly WorldSaveTrackingStrategy WorldSaveTrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
+        
         public const string Command = "tdiff";
 
         /// <summary>
@@ -51,11 +54,11 @@ namespace DiffBackup
 
         private readonly IBackupService _backupService;
 
-        private readonly FileSystemWatcher _watcher = new FileSystemWatcher {IncludeSubdirectories = false};
+        private readonly FileSystemWatcher? _watcher;
         private Stopwatch _lastWriteStopwatch = new Stopwatch();
 
-        private DateTime? prevRestoreDate = null;
-        private Stopwatch prevRestoreStopwatch = new Stopwatch();
+        private DateTime? _prevRestoreDate = null;
+        private Stopwatch _prevRestoreStopwatch = new Stopwatch();
 
         #endregion
 
@@ -66,6 +69,14 @@ namespace DiffBackup
         public DiffBackupPlugin(Main game) : base(game)
         {
             Order = 10;
+            if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.FileSystemWatcher))
+            {
+                _watcher = new FileSystemWatcher {IncludeSubdirectories = false};
+            }
+            if (WorldSaveTrackingStrategy == WorldSaveTrackingStrategy.None)
+            {
+                this.LogWarn("Tracking strategy set to none.");
+            }
             _backupService = new BackupService(this.Logger());
         }
 
@@ -79,7 +90,11 @@ namespace DiffBackup
             this.LogDebug("Initialize");
             ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
             ServerApi.Hooks.GamePostInitialize.Register(this, OnPostInitialize);
-            ServerApi.Hooks.WorldSave.Register(this, OnWorldSaved);
+
+            if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
+            {
+                ServerApi.Hooks.WorldSave.Register(this, OnWorldSaved);
+            }
         }
 
 
@@ -95,10 +110,13 @@ namespace DiffBackup
                 this.LogDebug("Removing all hooks");
                 ServerApi.Hooks.GameInitialize.Deregister(this, OnInitialize);
                 ServerApi.Hooks.GameInitialize.Deregister(this, OnPostInitialize);
-                ServerApi.Hooks.WorldSave.Deregister(this, OnWorldSaved);
+                if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
+                {
+                    ServerApi.Hooks.WorldSave.Deregister(this, OnWorldSaved);
+                }
 
                 _backupService.Dispose();
-                _watcher.Dispose();
+                _watcher?.Dispose();
             }
 
             base.Dispose(disposing);
@@ -174,19 +192,19 @@ namespace DiffBackup
 
                 if (args.Parameters[0].ToLowerInvariant() == "confirm")
                 {
-                    if (prevRestoreDate is null || !prevRestoreStopwatch.IsRunning)
+                    if (_prevRestoreDate is null || !_prevRestoreStopwatch.IsRunning)
                     {
                         args.Player.SendErrorMessage("There's nothing to confirm for now");
                         return;
                     }
-                    else if (prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
+                    else if (_prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
                     {
                         args.Player.SendErrorMessage("Confirmation timeout ! Try again");
                         return;
                     }
                     else
                     {
-                        date = prevRestoreDate.Value;
+                        date = _prevRestoreDate.Value;
                     }
                 }
                 else if (!TryParseDate(out date) || date == default)
@@ -223,8 +241,8 @@ namespace DiffBackup
             {
                 args.Player.SendWarningMessage(
                     $"In order to restore backup @ {dates[0]}, you need to enter /{Command} confirm");
-                prevRestoreDate = dates[0];
-                prevRestoreStopwatch = Stopwatch.StartNew();
+                _prevRestoreDate = dates[0];
+                _prevRestoreStopwatch = Stopwatch.StartNew();
                 return;
             }
         }
@@ -264,6 +282,7 @@ namespace DiffBackup
 
         private void OnPostInitialize(EventArgs args)
         {
+            if (_watcher is null) return;
             _watcher.NotifyFilter |= NotifyFilters.LastWrite;
             _watcher.Filter = Path.GetFileName(Main.worldPathName);
             _watcher.Path = Path.GetDirectoryName(Main.worldPathName);

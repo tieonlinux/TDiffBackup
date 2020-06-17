@@ -21,7 +21,7 @@ namespace DiffBackup
     [ApiVersion(2, 1)]
     public class DiffBackupPlugin : TerrariaPlugin
     {
-        public const WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
+        public readonly WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
 
         public const string Command = "tdiff";
 

@@ -4,3 +4,6 @@
 [submodule "HumanDateParser"]
 	path = HumanDateParser
 	url = https://github.com/ti-ka/human-date-parser.git
+[submodule "Base32"]
+	path = Base32
+	url = https://gist.github.com/9335c394c5cc65404c4cf9aceab04143.git

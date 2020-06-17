@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using DiffBackup;
 using DiffBackup.Backup;
+using DiffBackup.Logger;
 using Moq;
 using Xunit;
 

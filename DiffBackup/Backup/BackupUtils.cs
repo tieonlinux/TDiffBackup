@@ -72,11 +72,9 @@ namespace DiffBackup.Backup
 
         public static string HashFile(Stream stream)
         {
-            using var hasher = new SHA256Managed();
-            string hash = string.Empty;
+            using var hasher = new SHA1Managed();
             byte[] crypto = hasher.ComputeHash(stream);
-            hash = crypto.Aggregate(hash, (current, theByte) => $"{current}{theByte:x2}");
-            return hash;
+            return Base32.ToBase32String(crypto, false);
         }
 
         public static DateTime GetDateTime(BackupRepositoryEntry entry)

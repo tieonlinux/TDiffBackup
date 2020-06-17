@@ -33,7 +33,7 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-        <Reference Include="OTAPI, Version=1.4.0.5, Culture=neutral, PublicKeyToken=null">
+        <Reference Include="OTAPI">
           <HintPath>..\TShock\OTAPI.dll</HintPath>
         </Reference>
         <Reference Include="System" />
@@ -50,6 +50,9 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="..\Base32\Base32.cs">
+          <Link>Base32\Base32.cs</Link>
+        </Compile>
         <Compile Include="..\deltaq\deltaq\BsDiff\BsDiff.cs">
           <Link>deltaq\BsDiff\BsDiff.cs</Link>
         </Compile>

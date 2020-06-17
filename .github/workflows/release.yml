@@ -69,7 +69,7 @@ jobs:
       timeout-minutes: 5
 
     - name: Test using netcore
-      run: dotnet test
+      run: dotnet test --configuration Release
       timeout-minutes: 5
     
     - name: Install python deps

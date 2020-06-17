@@ -59,6 +59,10 @@ jobs:
     - name: Test using netcore
       run: dotnet test
       timeout-minutes: 5
+
+    - name: Test Release mode using netcore
+      run: dotnet test --configuration Release
+      timeout-minutes: 5
     
     - name: Install python deps
       run: python -m pip install --user requests bsdiff4

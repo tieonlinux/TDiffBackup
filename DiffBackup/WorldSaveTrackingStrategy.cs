@@ -3,7 +3,7 @@
 namespace DiffBackup
 {
     [Flags]
-    public enum WorldSaveTrackingStrategy: byte
+    public enum WorldSaveTrackingStrategy : byte
     {
         None,
         FileSystemWatcher,

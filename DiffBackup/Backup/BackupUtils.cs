@@ -21,10 +21,15 @@ namespace DiffBackup.Backup
             return $"{dateTime.ToString(TimeFormat)}_{referenceHash}{extension}";
         }
 
-        public static string FormatDiffFileName(DateTime dateTime, string referenceHash) =>
-            FormatFileName(dateTime, referenceHash, DiffFileExtension);
+        public static string FormatDiffFileName(DateTime dateTime, string referenceHash)
+        {
+            return FormatFileName(dateTime, referenceHash, DiffFileExtension);
+        }
 
-        public static string FormatWorldFileName(DateTime dateTime, string referenceHash) => FormatFileName(dateTime, referenceHash, WorldFileExtension);
+        public static string FormatWorldFileName(DateTime dateTime, string referenceHash)
+        {
+            return FormatFileName(dateTime, referenceHash, WorldFileExtension);
+        }
 
         private static (DateTime dateTime, string referenceHash) ParseFileName(string fileName, string extension)
         {
@@ -32,29 +37,39 @@ namespace DiffBackup.Backup
             var match = regex.Match(Path.GetFileName(fileName));
             if (match.Success && match.Groups[3].Value == extension)
             {
-                return (DateTime.ParseExact(match.Groups[1].Value, TimeFormat, CultureInfo.InvariantCulture), match.Groups[2].Value);
+                return (DateTime.ParseExact(match.Groups[1].Value, TimeFormat, CultureInfo.InvariantCulture),
+                    match.Groups[2].Value);
             }
+
             throw new FormatException($"Not a valid {extension} file name");
         }
 
-        public static (DateTime dateTime, string referenceHash) ParseDiffFileName(string fileName) =>
-            ParseFileName(fileName, DiffFileExtension);
+        public static (DateTime dateTime, string referenceHash) ParseDiffFileName(string fileName)
+        {
+            return ParseFileName(fileName, DiffFileExtension);
+        }
 
-        public static (DateTime dateTime, string referenceHash) ParseReferenceFileName(string fileName) => ParseFileName(fileName, WorldFileExtension);
+        public static (DateTime dateTime, string referenceHash) ParseReferenceFileName(string fileName)
+        {
+            return ParseFileName(fileName, WorldFileExtension);
+        }
 
         public static string GetRepoSubFolderNameForDate(DateTime date)
         {
             return date.ToString(DateFormat);
         }
 
-        public static string GetRepoFilePath(string worldPath) => worldPath + ".backups";
+        public static string GetRepoFilePath(string worldPath)
+        {
+            return worldPath + ".backups";
+        }
 
         public static string HashFile(BackupRepositoryEntry entry)
         {
             using var s = entry.Open();
             return HashFile(s);
         }
-        
+
         public static string HashFile(Stream stream)
         {
             using var hasher = new SHA256Managed();
@@ -63,7 +78,7 @@ namespace DiffBackup.Backup
             hash = crypto.Aggregate(hash, (current, theByte) => $"{current}{theByte:x2}");
             return hash;
         }
-        
+
         public static DateTime GetDateTime(BackupRepositoryEntry entry)
         {
             var fname = Path.GetFileName(entry.Name);
@@ -89,26 +104,10 @@ namespace DiffBackup.Backup
         {
             return Path.GetExtension(path) == DiffFileExtension;
         }
-        
+
         public static bool IsWorldFilePath(string path)
         {
             return Path.GetExtension(path) == WorldFileExtension;
-        }
-
-        public class BackupEntry
-        {
-            public readonly BackupRepositoryEntry Entry;
-            public readonly DateTime DateTime;
-            public readonly bool IsDiff;
-            public readonly BackupEntry? Reference;
-
-            public BackupEntry(BackupRepositoryEntry entry, DateTime dateTime, bool isDiff = false, BackupEntry? reference = null)
-            {
-                Entry = entry;
-                DateTime = dateTime;
-                IsDiff = isDiff;
-                Reference = reference;
-            }
         }
 
         public static IEnumerable<BackupEntry> ListBackup(BackupRepository repo)
@@ -118,13 +117,16 @@ namespace DiffBackup.Backup
 
         public static IEnumerable<BackupEntry> ListBackup(IEnumerable<BackupRepositoryEntry> entries)
         {
-            
             var referencePool = new Dictionary<string, BackupEntry>();
             var repositoryEntries = entries as BackupRepositoryEntry[] ?? entries.ToArray();
             foreach (var entry in repositoryEntries)
             {
                 var dt = GetDateTime(entry);
-                if (!IsWorldFilePath(entry.FullName)) continue;
+                if (!IsWorldFilePath(entry.FullName))
+                {
+                    continue;
+                }
+
                 var refName = ParseReferenceFileName(entry.Name);
                 var refEntry = new BackupEntry(entry, dt);
                 referencePool[refName.referenceHash] = refEntry;
@@ -135,12 +137,33 @@ namespace DiffBackup.Backup
             {
                 var dt = GetDateTime(entry);
                 var isDiff = IsDiffFilePath(entry.FullName);
-                if (!isDiff) continue;
+                if (!isDiff)
+                {
+                    continue;
+                }
+
                 var (_, referenceHash) = ParseDiffFileName(entry.Name);
                 if (referencePool.TryGetValue(referenceHash, out var reference))
                 {
                     yield return new BackupEntry(entry, dt, true, reference);
                 }
+            }
+        }
+
+        public class BackupEntry
+        {
+            public readonly DateTime DateTime;
+            public readonly BackupRepositoryEntry Entry;
+            public readonly bool IsDiff;
+            public readonly BackupEntry? Reference;
+
+            public BackupEntry(BackupRepositoryEntry entry, DateTime dateTime, bool isDiff = false,
+                BackupEntry? reference = null)
+            {
+                Entry = entry;
+                DateTime = dateTime;
+                IsDiff = isDiff;
+                Reference = reference;
             }
         }
     }

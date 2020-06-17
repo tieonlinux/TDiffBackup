@@ -3,16 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using deltaq_tie.BsDiff;
 using DiffBackup.Backup;
+using DiffBackup.Logger;
 using HumanDateParser_tie;
-using Microsoft.Xna.Framework;
 using Terraria;
-using Terraria.DataStructures;
 using TerrariaApi.Server;
 using TShockAPI;
 using TShockAPI.Extensions;
@@ -24,66 +21,63 @@ namespace DiffBackup
     [ApiVersion(2, 1)]
     public class DiffBackupPlugin : TerrariaPlugin
     {
+        public const WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
 
-        public readonly WorldSaveTrackingStrategy WorldSaveTrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
-        
         public const string Command = "tdiff";
-
-        /// <summary>
-        /// Gets the author(s) of this plugin
-        /// </summary>
-        public override string Author => "Tieonlinux";
-
-        /// <summary>
-        /// Gets the description of this plugin.
-        /// A short, one lined description that tells people what your plugin does.
-        /// </summary>
-        public override string Description => "A sample test plugin";
-
-        /// <summary>
-        /// Gets the name of this plugin.
-        /// </summary>
-        public override string Name => "TDiffBackup";
-
-        /// <summary>
-        /// Gets the version of this plugin.
-        /// </summary>
-        public override Version Version => GetType().Assembly.GetName().Version;
-
-        # region private fields
 
         private readonly IBackupService _backupService;
 
         private readonly FileSystemWatcher? _watcher;
         private Stopwatch _lastWriteStopwatch = new Stopwatch();
 
-        private DateTime? _prevRestoreDate = null;
+        private DateTime? _prevRestoreDate;
         private Stopwatch _prevRestoreStopwatch = new Stopwatch();
 
-        #endregion
-
         /// <summary>
-        /// Initializes a new instance of the TestPlugin class.
-        /// This is where you set the plugin's order and perfrom other constructor logic
+        ///     Initializes a new instance of the TestPlugin class.
+        ///     This is where you set the plugin's order and perfrom other constructor logic
         /// </summary>
         public DiffBackupPlugin(Main game) : base(game)
         {
             Order = 10;
-            if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.FileSystemWatcher))
+            if (TrackingStrategy.HasFlag(WorldSaveTrackingStrategy.FileSystemWatcher))
             {
                 _watcher = new FileSystemWatcher {IncludeSubdirectories = false};
             }
-            if (WorldSaveTrackingStrategy == WorldSaveTrackingStrategy.None)
+
+            if (TrackingStrategy == WorldSaveTrackingStrategy.None)
             {
                 this.LogWarn("Tracking strategy set to none.");
             }
+
             _backupService = new BackupService(this.Logger());
         }
 
         /// <summary>
-        /// Handles plugin initialization. 
-        /// Fired when the server is started and the plugin is being loaded.
-        /// You may register hooks, perform loading procedures etc here.
+        ///     Gets the author(s) of this plugin
+        /// </summary>
+        public override string Author => "Tieonlinux";
+
+        /// <summary>
+        ///     Gets the description of this plugin.
+        ///     A short, one lined description that tells people what your plugin does.
+        /// </summary>
+        public override string Description => "World file backup system";
+
+        /// <summary>
+        ///     Gets the name of this plugin.
+        /// </summary>
+        public override string Name => "TDiffBackup";
+
+        /// <summary>
+        ///     Gets the version of this plugin.
+        /// </summary>
+        public override Version Version => GetType().Assembly.GetName().Version;
+
+        /// <summary>
+        ///     Handles plugin initialization.
+        ///     Fired when the server is started and the plugin is being loaded.
+        ///     You may register hooks, perform loading procedures etc here.
         /// </summary>
         public override void Initialize()
         {
@@ -91,7 +85,7 @@ namespace DiffBackup
             ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
             ServerApi.Hooks.GamePostInitialize.Register(this, OnPostInitialize);
 
-            if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
+            if (TrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
             {
                 ServerApi.Hooks.WorldSave.Register(this, OnWorldSaved);
             }
@@ -99,18 +93,20 @@ namespace DiffBackup
 
 
         /// <summary>
-        /// Handles plugin disposal logic.
-        /// *Supposed* to fire when the server shuts down.
-        /// You should deregister hooks and free all resources here.
+        ///     Handles plugin disposal logic.
+        ///     *Supposed* to fire when the server shuts down.
+        ///     You should deregister hooks and free all resources here.
         /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                this.LogDebug("Disposing");
+
                 this.LogDebug("Removing all hooks");
                 ServerApi.Hooks.GameInitialize.Deregister(this, OnInitialize);
                 ServerApi.Hooks.GameInitialize.Deregister(this, OnPostInitialize);
-                if (WorldSaveTrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
+                if (TrackingStrategy.HasFlag(WorldSaveTrackingStrategy.SaveEventListener))
                 {
                     ServerApi.Hooks.WorldSave.Deregister(this, OnWorldSaved);
                 }
@@ -126,21 +122,21 @@ namespace DiffBackup
         private void OnInitialize(EventArgs args)
         {
             this.LogDebug("Adding chat commands");
-            Commands.ChatCommands.Add(new Command(Command, TdiffCmd, Command));
+            Commands.ChatCommands.Add(new Command(Command, DiffCmd, Command));
         }
 
-        private void TdiffCmd(CommandArgs args)
+        private void DiffCmd(CommandArgs args)
         {
             if (args.Parameters.Count == 0 || args.Parameters[0].ToLowerInvariant() == "help")
             {
                 args.Player.SendInfoMessage($"/{Command} ls <date> - list backups");
-                args.Player.SendInfoMessage($"/{Command} date - restore closest backup @ date");
+                args.Player.SendInfoMessage($"/{Command} <date> - restore closest backup @ date");
                 return;
             }
 
             bool TryParseDate(out DateTime dateTime, int shift = 0)
             {
-                var formats = new string[] {"yyyy/MM/dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd"};
+                var formats = new[] {"yyyy/MM/dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd"};
                 if (args.Parameters.Count > shift)
                 {
                     var str = string.Join(" ", args.Parameters.GetRange(shift, args.Parameters.Count - shift)).Trim();
@@ -183,7 +179,7 @@ namespace DiffBackup
             {
                 if (args.Parameters[0].ToLowerInvariant() == "ls" || args.Parameters[0].ToLowerInvariant() == "list")
                 {
-                    TryParseDate(out date, shift: 1);
+                    TryParseDate(out date, 1);
 
                     DisplayBackups(args, date, ListAndSortBackupDatetime());
                     return;
@@ -197,19 +193,18 @@ namespace DiffBackup
                         args.Player.SendErrorMessage("There's nothing to confirm for now");
                         return;
                     }
-                    else if (_prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
+
+                    if (_prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
                     {
                         args.Player.SendErrorMessage("Confirmation timeout ! Try again");
                         return;
                     }
-                    else
-                    {
-                        date = _prevRestoreDate.Value;
-                    }
+
+                    date = _prevRestoreDate.Value;
                 }
                 else if (!TryParseDate(out date) || date == default)
                 {
-                    args.Player.SendErrorMessage("Unable to parse date");
+                    args.Player.SendErrorMessage("Unable to parse given date");
                     return;
                 }
             }
@@ -217,13 +212,13 @@ namespace DiffBackup
             var dates = ListAndSortBackupDatetime();
             if (!dates.Any())
             {
-                args.Player.SendErrorMessage("no backup for now");
+                args.Player.SendErrorMessage("No backup for now.");
                 return;
             }
 
             if (Math.Abs((dates[0] - date).TotalSeconds) < 1)
             {
-                args.Player.SendWarningMessage($"Restoring backup @ {dates[0]}");
+                args.Player.SendWarningMessage($"Restoring backup @ {dates[0]}. Server is about to stop.");
                 this.LogWarn($"Restoring backup @ {dates[0]}");
                 try
                 {
@@ -243,7 +238,6 @@ namespace DiffBackup
                     $"In order to restore backup @ {dates[0]}, you need to enter /{Command} confirm");
                 _prevRestoreDate = dates[0];
                 _prevRestoreStopwatch = Stopwatch.StartNew();
-                return;
             }
         }
 
@@ -251,7 +245,7 @@ namespace DiffBackup
         {
             if (!dates.Any())
             {
-                args.Player.SendErrorMessage("no backup for now");
+                args.Player.SendErrorMessage("No backup for now.");
                 return false;
             }
 
@@ -282,21 +276,39 @@ namespace DiffBackup
 
         private void OnPostInitialize(EventArgs args)
         {
-            if (_watcher is null) return;
+            StartWatcher();
+        }
+
+        private void StartWatcher()
+        {
+            if (_watcher is null)
+            {
+                return;
+            }
+
             _watcher.NotifyFilter |= NotifyFilters.LastWrite;
             _watcher.Filter = Path.GetFileName(Main.worldPathName);
             _watcher.Path = Path.GetDirectoryName(Main.worldPathName);
             _watcher.Changed += OnFileChanged;
             _watcher.EnableRaisingEvents = true;
+            this.LogDebug("Started Watcher");
         }
 
-        private void OnWorldSaved(EventArgs args) => OnFileChanged(this,
-            new FileSystemEventArgs(WatcherChangeTypes.Changed, Path.GetDirectoryName(Main.worldPathName),
-                Path.GetFileName(Main.worldPathName)));
+        private void OnWorldSaved(EventArgs args)
+        {
+            OnFileChanged(this,
+                new FileSystemEventArgs(WatcherChangeTypes.Changed, Path.GetDirectoryName(Main.worldPathName),
+                    Path.GetFileName(Main.worldPathName)));
+        }
 
         private void OnFileChanged(object source, FileSystemEventArgs e)
         {
-            if (TShock.ShuttingDown) return;
+            if (TShock.ShuttingDown)
+            {
+                this.LogDebug("TShock is Shutting Down");
+                return;
+            }
+
             this.LogDebug("OnFileChanged " + e.FullPath);
             var debounceDelay = TimeSpan.FromSeconds(5);
             var precisionCorrection = TimeSpan.FromSeconds(1.0 / 30);
@@ -306,7 +318,12 @@ namespace DiffBackup
             async Task RecheckLaterAsync()
             {
                 await Task.Delay(debounceDelay);
-                if (TShock.ShuttingDown) return;
+                if (TShock.ShuttingDown)
+                {
+                    this.LogWarn("TShock is Shutting Down.");
+                    return;
+                }
+
                 if (_lastWriteStopwatch.Elapsed < debounceDelay - precisionCorrection)
                 {
                     return;
@@ -314,13 +331,13 @@ namespace DiffBackup
 
                 try
                 {
-                    //try opening the file
+                    //try opening the file to check lock if any
                     using var _ = File.OpenRead(e.FullPath);
                 }
                 catch (IOException ex)
                 {
-                    this.LogWarn($"Unable to open world file {e.Name}");
-                    this.LogDebug(ex.StackTrace, TraceLevel.Error);
+                    this.LogWarn($"Unable to open world file {e.Name}.");
+                    this.LogDebug(ex.BuildExceptionString(), TraceLevel.Error);
                     return;
                 }
 

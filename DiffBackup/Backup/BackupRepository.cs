@@ -10,8 +10,6 @@ namespace DiffBackup.Backup
     public class BackupRepository
     {
         public readonly string Path;
-        public bool Exists => Directory.Exists(Path);
-        public ReadOnlyCollection<BackupRepositoryEntry> Entries => ListEntries().ToList().AsReadOnly();
 
         public BackupRepository(string path, bool allowCreation = true)
         {
@@ -28,6 +26,9 @@ namespace DiffBackup.Backup
                 }
             }
         }
+
+        public bool Exists => Directory.Exists(Path);
+        public ReadOnlyCollection<BackupRepositoryEntry> Entries => ListEntries().ToList().AsReadOnly();
 
         public string ToRepoPath(string realPath)
         {
@@ -57,12 +58,12 @@ namespace DiffBackup.Backup
             return path.Split(new[] {System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar},
                 StringSplitOptions.RemoveEmptyEntries);
         }
-        
+
         public (string RelativePath, string RealPath) CheckIsRepoPath(string path)
         {
             var dir = System.IO.Path.GetFullPath(System.IO.Path.GetDirectoryName(path));
             var pathDirs = SplitPath(dir);
-            foreach (var (sub, i) in SplitPath(this.Path).Select(((s, i) => (Path: s, Index: i))))
+            foreach (var (sub, i) in SplitPath(Path).Select((s, i) => (Path: s, Index: i)))
             {
                 if (pathDirs.Length <= i || sub != pathDirs[i])
                 {
@@ -73,7 +74,8 @@ namespace DiffBackup.Backup
             return (ToRepoPath(path), System.IO.Path.GetFullPath(path));
         }
 
-        public BackupRepositoryEntry CreateEntryFromFile(string path, string repoPath, bool overwrite = true, bool createDirectories = true)
+        public BackupRepositoryEntry CreateEntryFromFile(string path, string repoPath, bool overwrite = true,
+            bool createDirectories = true)
         {
             var dest = CheckIsRepoPath(System.IO.Path.Combine(Path, repoPath));
             var dir = System.IO.Path.GetDirectoryName(dest.RealPath);
@@ -88,8 +90,8 @@ namespace DiffBackup.Backup
                     throw new DirectoryNotFoundException($"Directories \"{dest.RealPath}\" not found");
                 }
             }
-            
-            
+
+
             File.Copy(path, dest.RealPath, overwrite);
             return new BackupRepositoryEntry(this, dest.RealPath);
         }
@@ -105,7 +107,7 @@ namespace DiffBackup.Backup
             {
                 yield return new BackupRepositoryEntry(this, file);
             }
-            
+
             foreach (var dir in Directory.EnumerateDirectories(System.IO.Path.GetFullPath(path)))
             {
                 foreach (var sub in ListEntries(dir))
@@ -115,10 +117,10 @@ namespace DiffBackup.Backup
             }
         }
 
-        public BackupRepositoryEntry CreateEntry(string repoPath, bool existsOk=false)
+        public BackupRepositoryEntry CreateEntry(string repoPath, bool existsOk = false)
         {
             var res = new BackupRepositoryEntry(this, ToRealPath(repoPath));
-            using var _ = res.Open(existsOk ? FileMode.Create: FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            using var _ = res.Open(existsOk ? FileMode.Create : FileMode.CreateNew, FileAccess.ReadWrite);
             return res;
         }
 

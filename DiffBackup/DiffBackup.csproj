@@ -42,10 +42,10 @@
         <Reference Include="System.IO.Compression" />
         <Reference Include="System.IO.Compression.FileSystem" />
         <Reference Include="System.Xml" />
-        <Reference Include="TerrariaServer, Version=1.4.0.5, Culture=neutral, PublicKeyToken=null">
+        <Reference Include="TerrariaServer">
           <HintPath>..\TShock\TerrariaServer.exe</HintPath>
         </Reference>
-        <Reference Include="TShockAPI, Version=4.4.0.0, Culture=neutral, PublicKeyToken=null">
+        <Reference Include="TShockAPI">
           <HintPath>..\TShock\ServerPlugins\TShockAPI.dll</HintPath>
         </Reference>
     </ItemGroup>
@@ -121,7 +121,10 @@
         <Compile Include="Backup\BackupUtils.cs" />
         <Compile Include="Backup\IBackupService.cs" />
         <Compile Include="Backup\IBackupStrategy.cs" />
-        <Compile Include="TLog.cs" />
+        <Compile Include="Logger\DefaultTlog.cs" />
+        <Compile Include="Logger\ITlog.cs" />
+        <Compile Include="Logger\LoggingExt.cs" />
+        <Compile Include="Logger\TLog.cs" />
         <Compile Include="TdiffPlugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="WorldSaveTrackingStrategy.cs" />

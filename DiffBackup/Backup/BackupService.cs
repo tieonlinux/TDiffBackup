@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using deltaq_tie.BsDiff;
-using ThreadState = System.Threading.ThreadState;
+using DiffBackup.Logger;
 
 #nullable enable
 
@@ -14,24 +14,9 @@ namespace DiffBackup.Backup
 {
     public class BackupService : IDisposable, IBackupService
     {
+        private readonly SemaphoreSlim _saveDiffSemaphore = new SemaphoreSlim(1, 1);
         public readonly ITlog Log;
         private Stopwatch _saveDiffStopWatch = new Stopwatch();
-        private readonly SemaphoreSlim _saveDiffSemaphore = new SemaphoreSlim(1, 1);
-
-        public TimeSpan ThrottleTimeSpan { get; set; } = TimeSpan.FromMinutes(1);
-
-        public bool ShouldThrottle =>
-            ThrottleTimeSpan > TimeSpan.Zero && _saveDiffStopWatch.IsRunning && _saveDiffStopWatch.Elapsed < ThrottleTimeSpan;
-
-        public void ResetThrottle()
-        {
-            _saveDiffStopWatch = new Stopwatch();
-        }
-
-
-        public IBackupStrategy Strategy { get; }
-
-        public BackupIOWorker Worker { get; }
 
         public BackupService(ITlog log, IBackupStrategy? strategy = null, BackupIOWorker? worker = null)
         {
@@ -42,124 +27,30 @@ namespace DiffBackup.Backup
 
             // ReSharper disable once InconsistentNaming
             const string TdiffOverwriteThrottleTimeSpan = nameof(TdiffOverwriteThrottleTimeSpan);
-            
+
             if (env.Contains(TdiffOverwriteThrottleTimeSpan))
             {
-                ThrottleTimeSpan = TimeSpan.FromSeconds(double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteThrottleTimeSpan)));
+                ThrottleTimeSpan =
+                    TimeSpan.FromSeconds(
+                        double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteThrottleTimeSpan)));
             }
         }
+
+        public TimeSpan ThrottleTimeSpan { get; set; } = TimeSpan.FromMinutes(1);
+
+        public bool ShouldThrottle =>
+            ThrottleTimeSpan > TimeSpan.Zero && _saveDiffStopWatch.IsRunning &&
+            _saveDiffStopWatch.Elapsed < ThrottleTimeSpan;
+
+        public BackupIOWorker Worker { get; }
+
+
+        public IBackupStrategy Strategy { get; }
 
         public async Task StartBackup(string path, DateTime? dateTime = null,
             CancellationToken cancellationToken = default)
         {
             await BackupSaveAsync(path, dateTime, cancellationToken);
-        }
-
-        public void BackupSave(string path, DateTime? dateTime = null, CancellationToken cancellationToken = default)
-        {
-            StartBackup(path, dateTime, cancellationToken).Wait(cancellationToken);
-        }
-
-        public async Task BackupSaveAsync(string path, DateTime? dateTime = null,
-            CancellationToken cancellationToken = default)
-        {
-            using var timed = new CancellationTokenSource();
-            timed.CancelAfter(TimeSpan.FromMinutes(3));
-            using var tokenSource =
-                CancellationTokenSource.CreateLinkedTokenSource(Worker.Token, cancellationToken, timed.Token);
-            tokenSource.Token.ThrowIfCancellationRequested();
-            await _saveDiffSemaphore.WaitAsync(tokenSource.Token);
-
-            async Task<T> IoSchedule<T>(Func<T> func)
-            {
-                return await IoScheduleFunction(func, tokenSource!.Token);
-            }
-
-            async Task IoScheduleAction(Action func)
-            {
-                object Func()
-                {
-                    func();
-                    return new object();
-                }
-
-                await IoSchedule(Func);
-            }
-
-            try
-            {
-                if (ShouldThrottle)
-                {
-                    Log.LogDebug("Backup Throttle", TraceLevel.Warning);
-                    return;
-                }
-
-                var now = dateTime ?? DateTime.Now;
-                _saveDiffStopWatch = Stopwatch.StartNew();
-                var repo = new BackupRepository(BackupUtils.GetRepoFilePath(path));
-                var folderName = BackupUtils.GetRepoSubFolderNameForDate(now);
-                var oldEntry = Strategy.GetReference(repo, now);
-                if (oldEntry is null)
-                {
-                    Log.LogDebug($"Saving full world into repo \"{path}\"");
-                    string referenceName;
-                    {
-                        using var f = File.OpenRead(path);
-                        referenceName = await IoSchedule(() => BackupUtils.HashFile(f));
-                    }
-
-                    var fileName = BackupUtils.FormatWorldFileName(now, referenceName);
-                    await IoSchedule(() => repo.CreateEntryFromFile(path, $"{folderName}/{fileName}"));
-                    Log.LogInfo("Saved world checkpoint");
-                }
-                else
-                {
-                    var referenceFileName = BackupUtils.ParseReferenceFileName(oldEntry.Name);
-                    Log.LogDebug("Saving diff into repo " + path);
-                    var resultPath = $"{folderName}/{BackupUtils.FormatDiffFileName(now, referenceFileName.referenceHash)}";
-                    await IoScheduleAction(() => CreateDiff(path, repo, oldEntry, resultPath, now, tokenSource.Token));
-                    Log.LogInfo("Saved new world diff");
-                }
-            }
-            finally
-            {
-                _saveDiffSemaphore.Release();
-            }
-        }
-
-
-        private void CreateDiff(string path, BackupRepository repo, BackupRepositoryEntry oldEntry, string resultPath,
-            DateTime date,
-            CancellationToken cancellationToken)
-        {
-            byte[] prevBuffer;
-
-            {
-                using var s = oldEntry.Open();
-                using var ms = new MemoryStream();
-                s.CopyTo(ms);
-                cancellationToken.ThrowIfCancellationRequested();
-                prevBuffer = ms.ToArray();
-                Log.LogDebug($"{nameof(BackupService)} has read the old file");
-            }
-            var diff = Diff(path, prevBuffer);
-            cancellationToken.ThrowIfCancellationRequested();
-            var entry = repo.CreateEntry(resultPath);
-            using (var s = entry.Open(FileMode.Create))
-            {
-                s.Write(diff, 0, diff.Length);
-            }
-
-            entry.LastWriteTime = date;
-        }
-
-        private byte[] Diff(string currentFilePath, byte[] oldFileContent)
-        {
-            using var ms = new MemoryStream();
-            var content = File.ReadAllBytes(currentFilePath);
-            Worker.Token.ThrowIfCancellationRequested();
-            BsDiff.Create(oldFileContent, content, ms);
-            return ms.ToArray();
         }
 
 
@@ -229,6 +120,126 @@ namespace DiffBackup.Backup
             }
         }
 
+        public void Dispose()
+        {
+            Log.LogDebug($"{nameof(BackupService)} Dispose");
+            Worker.Dispose();
+            _saveDiffSemaphore.Dispose();
+        }
+
+        public void ResetThrottle()
+        {
+            _saveDiffStopWatch = new Stopwatch();
+        }
+
+        public void BackupSave(string path, DateTime? dateTime = null, CancellationToken cancellationToken = default)
+        {
+            StartBackup(path, dateTime, cancellationToken).Wait(cancellationToken);
+        }
+
+        public async Task BackupSaveAsync(string path, DateTime? dateTime = null,
+            CancellationToken cancellationToken = default)
+        {
+            using var timed = new CancellationTokenSource();
+            timed.CancelAfter(TimeSpan.FromMinutes(3));
+            using var tokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(Worker.Token, cancellationToken, timed.Token);
+            tokenSource.Token.ThrowIfCancellationRequested();
+            await _saveDiffSemaphore.WaitAsync(tokenSource.Token);
+
+            async Task<T> IoSchedule<T>(Func<T> func)
+            {
+                return await IoScheduleFunction(func, tokenSource!.Token);
+            }
+
+            async Task IoScheduleAction(Action func)
+            {
+                object Func()
+                {
+                    func();
+                    return new object();
+                }
+
+                await IoSchedule(Func);
+            }
+
+            try
+            {
+                if (ShouldThrottle)
+                {
+                    Log.LogDebug("Backup Throttle", TraceLevel.Warning);
+                    return;
+                }
+
+                var now = dateTime ?? DateTime.Now;
+                _saveDiffStopWatch = Stopwatch.StartNew();
+                var repo = new BackupRepository(BackupUtils.GetRepoFilePath(path));
+                var folderName = BackupUtils.GetRepoSubFolderNameForDate(now);
+                var oldEntry = Strategy.GetReference(repo, now);
+                if (oldEntry is null)
+                {
+                    Log.LogDebug($"Saving full world into repo \"{path}\"");
+                    string referenceName;
+                    {
+                        using var f = File.OpenRead(path);
+                        referenceName = await IoSchedule(() => BackupUtils.HashFile(f));
+                    }
+
+                    var fileName = BackupUtils.FormatWorldFileName(now, referenceName);
+                    await IoSchedule(() => repo.CreateEntryFromFile(path, $"{folderName}/{fileName}"));
+                    Log.LogInfo("Saved world checkpoint");
+                }
+                else
+                {
+                    var referenceFileName = BackupUtils.ParseReferenceFileName(oldEntry.Name);
+                    Log.LogDebug("Saving diff into repo " + path);
+                    var resultPath =
+                        $"{folderName}/{BackupUtils.FormatDiffFileName(now, referenceFileName.referenceHash)}";
+                    await IoScheduleAction(() => CreateDiff(path, repo, oldEntry, resultPath, now, tokenSource.Token));
+                    Log.LogInfo("Saved new world diff");
+                }
+            }
+            finally
+            {
+                _saveDiffSemaphore.Release();
+            }
+        }
+
+
+        private void CreateDiff(string path, BackupRepository repo, BackupRepositoryEntry oldEntry, string resultPath,
+            DateTime date,
+            CancellationToken cancellationToken)
+        {
+            byte[] prevBuffer;
+
+            {
+                using var s = oldEntry.Open();
+                using var ms = new MemoryStream();
+                s.CopyTo(ms);
+                cancellationToken.ThrowIfCancellationRequested();
+                prevBuffer = ms.ToArray();
+                Log.LogDebug($"{nameof(BackupService)} has read the old file");
+            }
+            var diff = Diff(path, prevBuffer);
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = repo.CreateEntry(resultPath);
+            using (var s = entry.Open(FileMode.Create))
+            {
+                s.Write(diff, 0, diff.Length);
+            }
+
+            entry.LastWriteTime = date;
+        }
+
+        private byte[] Diff(string currentFilePath, byte[] oldFileContent)
+        {
+            using var ms = new MemoryStream();
+            var content = File.ReadAllBytes(currentFilePath);
+            Worker.Token.ThrowIfCancellationRequested();
+            BsDiff.Create(oldFileContent, content, ms);
+            return ms.ToArray();
+        }
+
 
         private async Task<T> IoScheduleFunction<T>(Func<T> action, CancellationToken cancellationToken)
         {
@@ -239,13 +250,6 @@ namespace DiffBackup.Backup
             }
 
             return await Worker.IoScheduleFunction(action, cancellationToken);
-        }
-
-        public void Dispose()
-        {
-            Log.LogDebug($"{nameof(BackupService)} Dispose");
-            Worker.Dispose();
-            _saveDiffSemaphore.Dispose();
         }
     }
 }

@@ -122,6 +122,7 @@
         <Compile Include="Backup\BackupService.cs" />
         <Compile Include="Backup\BackupStrategy.cs" />
         <Compile Include="Backup\BackupUtils.cs" />
+        <Compile Include="Backup\Config\Config.cs" />
         <Compile Include="Backup\IBackupService.cs" />
         <Compile Include="Backup\IBackupStrategy.cs" />
         <Compile Include="Logger\DefaultTlog.cs" />

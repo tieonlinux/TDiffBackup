@@ -53,17 +53,16 @@ namespace DiffBackup.Backup
             return check ? CheckIsRepoPath(res).RealPath : res;
         }
 
-        private static string[] SplitPath(string path)
+        public void Delete(BackupRepositoryEntry entry)
         {
-            return path.Split(new[] {System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar},
-                StringSplitOptions.RemoveEmptyEntries);
+            File.Delete(entry.RealPath);
         }
 
         public (string RelativePath, string RealPath) CheckIsRepoPath(string path)
         {
             var dir = System.IO.Path.GetFullPath(System.IO.Path.GetDirectoryName(path));
-            var pathDirs = SplitPath(dir);
-            foreach (var (sub, i) in SplitPath(Path).Select((s, i) => (Path: s, Index: i)))
+            var pathDirs = BackupUtils.SplitPath(dir);
+            foreach (var (sub, i) in BackupUtils.SplitPath(Path).Select((s, i) => (Path: s, Index: i)))
             {
                 if (pathDirs.Length <= i || sub != pathDirs[i])
                 {
@@ -117,8 +116,21 @@ namespace DiffBackup.Backup
             }
         }
 
-        public BackupRepositoryEntry CreateEntry(string repoPath, bool existsOk = false)
+        public BackupRepositoryEntry CreateEntry(string repoPath, bool existsOk = false, bool createDir = true)
         {
+            if (createDir)
+            {
+                var paths = BackupUtils.SplitPath(repoPath);
+                if (paths.Length >= 2)
+                {
+                    var dir = System.IO.Path.Combine(new ArraySegment<string>(paths, 0, paths.Length - 1).ToArray());
+                    if (!Directory.Exists(ToRealPath(dir)))
+                    {
+                        Directory.CreateDirectory(ToRealPath(dir));
+                    }
+                }
+            }
+
             var res = new BackupRepositoryEntry(this, ToRealPath(repoPath));
             using var _ = res.Open(existsOk ? FileMode.Create : FileMode.CreateNew, FileAccess.ReadWrite);
             return res;

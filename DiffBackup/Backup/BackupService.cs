@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using deltaq_tie.BsDiff;
 using DiffBackup.Logger;
+using TShockAPI.Extensions;
 
 #nullable enable
 
@@ -21,7 +22,7 @@ namespace DiffBackup.Backup
         public BackupService(ITlog log, IBackupStrategy? strategy = null, BackupIOWorker? worker = null)
         {
             Log = log;
-            Strategy = strategy ?? new DefaultBackupStrategy();
+            Strategy = strategy ?? new DefaultBackupStrategy(Log);
             Worker = worker ?? new BackupIOWorker(log);
             var env = Environment.GetEnvironmentVariables();
 
@@ -51,6 +52,13 @@ namespace DiffBackup.Backup
             CancellationToken cancellationToken = default)
         {
             await BackupSaveAsync(path, dateTime, cancellationToken);
+        }
+
+        public async Task<IList<BackupRepositoryEntry>> StartCleanup(string worldPath,
+            CancellationToken cancellationToken = default)
+        {
+            var repo = new BackupRepository(BackupUtils.GetRepoFilePath(Path.GetFullPath(worldPath)));
+            return await Worker.IoScheduleFunction(() => Cleanup(repo), cancellationToken);
         }
 
 
@@ -125,6 +133,46 @@ namespace DiffBackup.Backup
             Log.LogDebug($"{nameof(BackupService)} Dispose");
             Worker.Dispose();
             _saveDiffSemaphore.Dispose();
+            Strategy.Dispose();
+        }
+
+        private IList<BackupRepositoryEntry> Cleanup(BackupRepository repo)
+        {
+            var res = new List<BackupRepositoryEntry>();
+            var stable = false;
+            var exceptions = new List<IOException>();
+            var now = DateTime.Now;
+            while (!stable)
+            {
+                var expiredEntries = Strategy.ListExpiredEntries(repo, now);
+                stable = !expiredEntries.Any();
+                foreach (var entry in expiredEntries)
+                {
+                    try
+                    {
+                        repo.Delete(entry);
+                        Log.LogInfo($"Deleted file \"{entry.RealPath}\"");
+                        res.Add(entry);
+                    }
+                    catch (IOException e)
+                    {
+                        Log.LogError($"Unable to delete \"{entry.RealPath}\":\n{e.BuildExceptionString()}");
+                        exceptions.Add(e);
+                    }
+                }
+            }
+
+            if (!res.Any() && exceptions.Any())
+            {
+                if (exceptions.Count == 1)
+                {
+                    throw exceptions.First();
+                }
+
+                throw new AggregateException(exceptions);
+            }
+
+            return res;
         }
 
         public void ResetThrottle()

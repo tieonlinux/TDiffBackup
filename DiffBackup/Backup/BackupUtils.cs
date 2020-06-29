@@ -74,7 +74,7 @@ namespace DiffBackup.Backup
         {
             using var hasher = new SHA1Managed();
             byte[] crypto = hasher.ComputeHash(stream);
-            return Base32.ToBase32String(crypto, false);
+            return Base32.ToBase32String(crypto);
         }
 
         public static DateTime GetDateTime(BackupRepositoryEntry entry)
@@ -108,12 +108,13 @@ namespace DiffBackup.Backup
             return Path.GetExtension(path) == WorldFileExtension;
         }
 
-        public static IEnumerable<BackupEntry> ListBackup(BackupRepository repo)
+        public static IEnumerable<BackupEntry> ListBackup(BackupRepository repo, bool returnsInvalids = false)
         {
-            return ListBackup(repo.Entries);
+            return ListBackup(repo.Entries, returnsInvalids);
         }
 
-        public static IEnumerable<BackupEntry> ListBackup(IEnumerable<BackupRepositoryEntry> entries)
+        public static IEnumerable<BackupEntry> ListBackup(IEnumerable<BackupRepositoryEntry> entries,
+            bool returnsInvalids = false)
         {
             var referencePool = new Dictionary<string, BackupEntry>();
             var repositoryEntries = entries as BackupRepositoryEntry[] ?? entries.ToArray();
@@ -145,10 +146,20 @@ namespace DiffBackup.Backup
                 {
                     yield return new BackupEntry(entry, dt, true, reference);
                 }
+                else if (returnsInvalids)
+                {
+                    yield return new BackupEntry(entry, dt, true);
+                }
             }
         }
 
-        public class BackupEntry
+        public static string[] SplitPath(string path)
+        {
+            return path.Split(new[] {Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar},
+                StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        public class BackupEntry : IEquatable<BackupEntry>
         {
             public readonly DateTime DateTime;
             public readonly BackupRepositoryEntry Entry;
@@ -162,6 +173,55 @@ namespace DiffBackup.Backup
                 DateTime = dateTime;
                 IsDiff = isDiff;
                 Reference = reference;
+            }
+
+            public bool Valid => !IsDiff || !ReferenceEquals(Reference, null);
+
+
+            public bool Equals(BackupEntry? other)
+            {
+                if (ReferenceEquals(null, other))
+                {
+                    return false;
+                }
+
+                if (ReferenceEquals(this, other))
+                {
+                    return true;
+                }
+
+                return Fields().Equals(other.Fields());
+            }
+
+            private Tuple<DateTime, BackupRepositoryEntry, bool, BackupEntry?> Fields()
+            {
+                return new Tuple<DateTime, BackupRepositoryEntry, bool, BackupEntry?>(DateTime, Entry, IsDiff,
+                    Reference);
+            }
+
+            public override bool Equals(object? obj)
+            {
+                if (ReferenceEquals(null, obj))
+                {
+                    return false;
+                }
+
+                if (ReferenceEquals(this, obj))
+                {
+                    return true;
+                }
+
+                if (obj.GetType() != GetType())
+                {
+                    return false;
+                }
+
+                return Equals((BackupEntry) obj);
+            }
+
+            public override int GetHashCode()
+            {
+                return Fields().GetHashCode();
             }
         }
     }

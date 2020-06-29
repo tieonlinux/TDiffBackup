@@ -21,17 +21,17 @@ namespace DiffBackup
     [ApiVersion(2, 1)]
     public class DiffBackupPlugin : TerrariaPlugin
     {
-        public readonly WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
-
         public const string Command = "tdiff";
 
         private readonly IBackupService _backupService;
 
         private readonly FileSystemWatcher? _watcher;
+        public readonly WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
         private Stopwatch _lastWriteStopwatch = new Stopwatch();
 
         private DateTime? _prevRestoreDate;
         private Stopwatch _prevRestoreStopwatch = new Stopwatch();
+        private string? _prevUserUuid;
 
         /// <summary>
         ///     Initializes a new instance of the TestPlugin class.
@@ -131,6 +131,7 @@ namespace DiffBackup
             {
                 args.Player.SendInfoMessage($"/{Command} ls <date> - list backups");
                 args.Player.SendInfoMessage($"/{Command} <date> - restore closest backup @ date");
+                args.Player.SendInfoMessage($"/{Command} cleanup - to remove old backup entries");
                 return;
             }
 
@@ -185,12 +186,50 @@ namespace DiffBackup
                     return;
                 }
 
+                if (args.Parameters[0].ToLowerInvariant() == "cleanup")
+                {
+                    if (TShock.ShuttingDown)
+                    {
+                        this.LogWarn("TShock is Shutting Down.");
+                        return;
+                    }
+
+                    Task.Factory.StartNew(async () =>
+                    {
+
+                        await _backupService.StartCleanup(Main.WorldPath).ContinueWith(task =>
+                        {
+                            if (task.IsFaulted)
+                            {
+                                Exception exception = task.Exception;
+                                if (exception is AggregateException aggex && aggex.InnerExceptions.Count == 1)
+                                {
+                                    exception = aggex.InnerExceptions.First();
+                                }
+                                args.Player.SendErrorMessage($"Error: {exception.Message}");
+                                this.LogError(exception.BuildExceptionString());
+                            }
+                            else if (task.IsCompleted)
+                            {
+                                args.Player.SendSuccessMessage($"Deleted {task.Result.Count} old files");
+                                this.LogInfo($"Backup cleanup done with {task.Result.Count} files deleted");
+                            }
+                        });
+                    });
+                    return;
+                }
 
                 if (args.Parameters[0].ToLowerInvariant() == "confirm")
                 {
                     if (_prevRestoreDate is null || !_prevRestoreStopwatch.IsRunning)
                     {
                         args.Player.SendErrorMessage("There's nothing to confirm for now");
+                        return;
+                    }
+
+                    if (_prevUserUuid != args.Player.UUID)
+                    {
+                        args.Player.SendErrorMessage("Someone else is trying to restore a backup !");
                         return;
                     }
 
@@ -238,6 +277,7 @@ namespace DiffBackup
                     $"In order to restore backup @ {dates[0]}, you need to enter /{Command} confirm");
                 _prevRestoreDate = dates[0];
                 _prevRestoreStopwatch = Stopwatch.StartNew();
+                _prevUserUuid = args.Player.UUID;
             }
         }
 

@@ -49,6 +49,8 @@ class PopenBuffer(threading.Thread):
         self.buff = io.BytesIO()
         self.setDaemon(True)
         self.start()
+        self._condition = threading.Condition()
+        self._condition_listener_counter = 0
 
     def run(self, *args, **kwargs):
         while not self.event.is_set():
@@ -61,6 +63,25 @@ class PopenBuffer(threading.Thread):
                     raise
             else:
                 self.buff.write(line)
+                with self._condition:
+                    if self._condition_listener_counter > 0:
+                        self._condition.notify_all()
+
+    def wait_for_new_line(self, timeout=None):
+        with self._condition:
+            self._condition_listener_counter += 1
+            try:
+                return self._condition.wait(timeout=timeout)
+            finally:
+                self._condition_listener_counter -= 1
+
+    def wait_for_new_line_with_pred(self, predicate, timeout=None):
+        with self._condition:
+            self._condition_listener_counter += 1
+            try:
+                return self._condition.wait_for(predicate, timeout=timeout)
+            finally:
+                self._condition_listener_counter -= 1
 
     def read(self) -> bytes:
         return self.buff.getvalue()
@@ -157,12 +178,21 @@ class IntegrationTest(unittest.TestCase):
                 return pattern(buff)
             return pattern in buff
 
-        print("wait_for_ouput")
         t = time.monotonic()
-        while not is_a_match(buff):
-            if time.monotonic() - t > timeout:
-                raise TimeoutError()
+        c = 0
+        while timeout is None or time.monotonic() - t < timeout:
+            if is_a_match(buff):
+                break
+            if c > 0:
+                wait_timeout = None
+                if timeout is not None:
+                    wait_timeout = timeout - (time.monotonic() - t)
+                    wait_timeout = max(wait_timeout, 0.1)
+                self.pbuff.wait_for_new_line(timeout=wait_timeout)
             buff = self.pbuff.read()
+            c += 1
+        else:
+            raise TimeoutError("could not found given pattern for {timeout} seconds ({c} iterations)")
         if clear:
             self.pbuff.clear()
         return buff

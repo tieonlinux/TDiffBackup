@@ -13,7 +13,7 @@ from typing import Optional, Union, Collection, Set
 OptionalPath = Union[None, Path, str]
 
 
-def download_tshock(url=r"https://github.com/Pryaxis/TShock/releases/download/v4.4.0-pre11/TShock4.4.0_Pre11_Terraria1.4.0.5.zip", dest: OptionalPath=None):
+def download_tshock(url=r"https://github.com/Pryaxis/TShock/releases/download/v4.4.0-pre12/TShock4.4.0_Pre12_Terraria1.4.0.5.zip", dest: OptionalPath=None):
     if dest is None:
         dest = "./TShock"
     dest: Path = Path(dest)

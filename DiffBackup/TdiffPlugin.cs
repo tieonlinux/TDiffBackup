@@ -149,7 +149,7 @@ namespace DiffBackup
             if (args.Parameters.Count == 0 || args.Parameters[0].ToLowerInvariant() == "help")
             {
                 args.Player.SendInfoMessage($"/{Command} ls <date> - list backups");
-                args.Player.SendInfoMessage($"/{Command} <date> - restore closest backup @ date");
+                args.Player.SendInfoMessage($"/{Command} restore <date> - restore closest backup @ date");
                 args.Player.SendInfoMessage($"/{Command} cleanup - to remove old backup entries");
                 return;
             }
@@ -195,77 +195,83 @@ namespace DiffBackup
                 return res;
             }
 
-            if (args.Parameters.Count > 0)
+            if (args.Parameters[0].ToLowerInvariant() == "ls" || args.Parameters[0].ToLowerInvariant() == "list")
             {
-                if (args.Parameters[0].ToLowerInvariant() == "ls" || args.Parameters[0].ToLowerInvariant() == "list")
-                {
-                    TryParseDate(out date, 1);
+                TryParseDate(out date, 1);
 
-                    DisplayBackups(args, date, ListAndSortBackupDatetime());
+                DisplayBackups(args, date, ListAndSortBackupDatetime());
+                return;
+            }
+
+            if (args.Parameters[0].ToLowerInvariant() == "cleanup")
+            {
+                if (TShock.ShuttingDown)
+                {
+                    this.LogWarn("TShock is Shutting Down.");
                     return;
                 }
 
-                if (args.Parameters[0].ToLowerInvariant() == "cleanup")
+                Task.Factory.StartNew(async () =>
                 {
-                    if (TShock.ShuttingDown)
+                    await _backupService.StartCleanup(Main.worldPathName).ContinueWith(task =>
                     {
-                        this.LogWarn("TShock is Shutting Down.");
-                        return;
-                    }
-
-                    Task.Factory.StartNew(async () =>
-                    {
-                        await _backupService.StartCleanup(Main.worldPathName).ContinueWith(task =>
+                        if (task.IsFaulted)
                         {
-                            if (task.IsFaulted)
+                            Exception exception = task.Exception;
+                            if (exception is AggregateException aggex && aggex.InnerExceptions.Count == 1)
                             {
-                                Exception exception = task.Exception;
-                                if (exception is AggregateException aggex && aggex.InnerExceptions.Count == 1)
-                                {
-                                    exception = aggex.InnerExceptions.First();
-                                }
+                                exception = aggex.InnerExceptions.First();
+                            }
 
-                                args.Player.SendErrorMessage($"Error: {exception.Message}");
-                                this.LogError(exception.BuildExceptionString());
-                            }
-                            else if (task.IsCompleted)
-                            {
-                                args.Player.SendSuccessMessage($"Deleted {task.Result.Count} old files");
-                                this.LogInfo($"Backup cleanup done with {task.Result.Count} files deleted");
-                            }
-                        });
+                            args.Player.SendErrorMessage($"Error: {exception.Message}");
+                            this.LogError(exception.BuildExceptionString());
+                        }
+                        else if (task.IsCompleted)
+                        {
+                            args.Player.SendSuccessMessage($"Deleted {task.Result.Count} old files");
+                            this.LogInfo($"Backup cleanup done with {task.Result.Count} files deleted");
+                        }
                     });
+                });
+                return;
+            }
+
+            if (args.Parameters[0].ToLowerInvariant() == "confirm")
+            {
+                if (_prevRestoreDate is null || !_prevRestoreStopwatch.IsRunning)
+                {
+                    args.Player.SendErrorMessage("There's nothing to confirm for now");
                     return;
                 }
 
-                if (args.Parameters[0].ToLowerInvariant() == "confirm")
+                if (_prevUserUuid != args.Player.UUID)
                 {
-                    if (_prevRestoreDate is null || !_prevRestoreStopwatch.IsRunning)
-                    {
-                        args.Player.SendErrorMessage("There's nothing to confirm for now");
-                        return;
-                    }
-
-                    if (_prevUserUuid != args.Player.UUID)
-                    {
-                        args.Player.SendErrorMessage("Someone else is trying to restore a backup !");
-                        return;
-                    }
-
-                    if (_prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
-                    {
-                        args.Player.SendErrorMessage("Confirmation timeout ! Try again");
-                        return;
-                    }
-
-                    date = _prevRestoreDate.Value;
+                    args.Player.SendErrorMessage("Someone else is trying to restore a backup !");
+                    return;
                 }
-                else if (!TryParseDate(out date) || date == default)
+
+                if (_prevRestoreStopwatch.Elapsed > TimeSpan.FromMinutes(2))
+                {
+                    args.Player.SendErrorMessage("Confirmation timeout ! Try again");
+                    return;
+                }
+
+                date = _prevRestoreDate.Value;
+            }
+            else if (args.Parameters[0].ToLowerInvariant() == "restore")
+            {
+                if (!TryParseDate(out date, 1) || date == default)
                 {
                     args.Player.SendErrorMessage("Unable to parse given date");
                     return;
                 }
             }
+            else
+            {
+                args.Player.SendErrorMessage($"Unknown command \"{args.Parameters[0]}\"");
+                return;
+            }
+
 
             var dates = ListAndSortBackupDatetime();
             if (!dates.Any())

@@ -7,8 +7,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DiffBackup.Backup;
+using DiffBackup.Backup.Config;
+using DiffBackup.Backup.Config.Json;
 using DiffBackup.Logger;
-using HumanDateParser_tie;
+using HumanDateParser_tie_tdiff;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
@@ -26,7 +28,7 @@ namespace DiffBackup
         private readonly IBackupService _backupService;
 
         private readonly FileSystemWatcher? _watcher;
-        public readonly WorldSaveTrackingStrategy TrackingStrategy = WorldSaveTrackingStrategy.SaveEventListener;
+        public readonly AllConfig Config;
         private Stopwatch _lastWriteStopwatch = new Stopwatch();
 
         private DateTime? _prevRestoreDate;
@@ -40,6 +42,7 @@ namespace DiffBackup
         public DiffBackupPlugin(Main game) : base(game)
         {
             Order = 10;
+            Config = LoadOrCreateConfig();
             if (TrackingStrategy.HasFlag(WorldSaveTrackingStrategy.FileSystemWatcher))
             {
                 _watcher = new FileSystemWatcher {IncludeSubdirectories = false};
@@ -50,8 +53,10 @@ namespace DiffBackup
                 this.LogWarn("Tracking strategy set to none.");
             }
 
-            _backupService = new BackupService(this.Logger());
+            _backupService = new BackupService(this.Logger(), Config);
         }
+
+        public WorldSaveTrackingStrategy TrackingStrategy => Config.Internal.WorldSaveTrackingStrategy;
 
         /// <summary>
         ///     Gets the author(s) of this plugin
@@ -73,6 +78,20 @@ namespace DiffBackup
         ///     Gets the version of this plugin.
         /// </summary>
         public override Version Version => GetType().Assembly.GetName().Version;
+
+        private static AllConfig LoadOrCreateConfig()
+        {
+            var configHandler = new TShockConfigHandler();
+            var fileName = $"{Command.ToLower()}.json";
+            if (configHandler.TryLoadJson<AllConfig>(fileName, out var res))
+            {
+                return res;
+            }
+
+            res = new AllConfig();
+            configHandler.SaveConfig(res, fileName);
+            return res;
+        }
 
         /// <summary>
         ///     Handles plugin initialization.
@@ -196,8 +215,7 @@ namespace DiffBackup
 
                     Task.Factory.StartNew(async () =>
                     {
-
-                        await _backupService.StartCleanup(Main.WorldPath).ContinueWith(task =>
+                        await _backupService.StartCleanup(Main.worldPathName).ContinueWith(task =>
                         {
                             if (task.IsFaulted)
                             {
@@ -206,6 +224,7 @@ namespace DiffBackup
                                 {
                                     exception = aggex.InnerExceptions.First();
                                 }
+
                                 args.Player.SendErrorMessage($"Error: {exception.Message}");
                                 this.LogError(exception.BuildExceptionString());
                             }

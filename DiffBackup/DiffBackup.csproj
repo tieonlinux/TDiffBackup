@@ -41,6 +41,7 @@
         <Reference Include="System.Data" />
         <Reference Include="System.IO.Compression" />
         <Reference Include="System.IO.Compression.FileSystem" />
+        <Reference Include="System.Runtime.Serialization" />
         <Reference Include="System.Xml" />
         <Reference Include="TerrariaServer">
           <HintPath>..\TShock\TerrariaServer.exe</HintPath>
@@ -116,13 +117,104 @@
         <Compile Include="..\HumanDateParser\HumanDateParser\TokenKind.cs">
           <Link>HumanDateParser\TokenKind.cs</Link>
         </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\CancelReaderException.cs">
+          <Link>JsonKit\CancelReaderException.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\DecoratingActivator.cs">
+          <Link>JsonKit\DecoratingActivator.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\Emit.cs">
+          <Link>JsonKit\Emit.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IDictionaryExtensions.cs">
+          <Link>JsonKit\IDictionaryExtensions.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonLoaded.cs">
+          <Link>JsonKit\IJsonLoaded.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonLoadField.cs">
+          <Link>JsonKit\IJsonLoadField.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonLoading.cs">
+          <Link>JsonKit\IJsonLoading.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonReader.cs">
+          <Link>JsonKit\IJsonReader.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonWriter.cs">
+          <Link>JsonKit\IJsonWriter.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonWriting.cs">
+          <Link>JsonKit\IJsonWriting.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\IJsonWritten.cs">
+          <Link>JsonKit\IJsonWritten.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonAttribute.cs">
+          <Link>JsonKit\JsonAttribute.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonExcludeAttribute.cs">
+          <Link>JsonKit\JsonExcludeAttribute.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonKit.cs">
+          <Link>JsonKit\JsonKit.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonMemberInfo.cs">
+          <Link>JsonKit\JsonMemberInfo.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonOptions.cs">
+          <Link>JsonKit\JsonOptions.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonParseException.cs">
+          <Link>JsonKit\JsonParseException.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonReader.cs">
+          <Link>JsonKit\JsonReader.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonUnknownAttribute.cs">
+          <Link>JsonKit\JsonUnknownAttribute.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\JsonWriter.cs">
+          <Link>JsonKit\JsonWriter.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\LineOffset.cs">
+          <Link>JsonKit\LineOffset.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\LiteralKind.cs">
+          <Link>JsonKit\LiteralKind.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\ReflectionInfo.cs">
+          <Link>JsonKit\ReflectionInfo.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\ThreadSafeCache.cs">
+          <Link>JsonKit\ThreadSafeCache.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\Token.cs">
+          <Link>JsonKit\Token.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\Tokenizer.cs">
+          <Link>JsonKit\Tokenizer.cs</Link>
+        </Compile>
+        <Compile Include="..\JsonKit\Topten.JsonKit\Utils.cs">
+          <Link>JsonKit\Utils.cs</Link>
+        </Compile>
         <Compile Include="Backup\BackupIOWorker.cs" />
         <Compile Include="Backup\BackupRepository.cs" />
         <Compile Include="Backup\BackupRepositoryEntry.cs" />
         <Compile Include="Backup\BackupService.cs" />
         <Compile Include="Backup\BackupStrategy.cs" />
         <Compile Include="Backup\BackupUtils.cs" />
-        <Compile Include="Backup\Config\Config.cs" />
+        <Compile Include="Backup\Config\AllConfig.cs" />
+        <Compile Include="Backup\Config\CleanupConfig.cs" />
+        <Compile Include="Backup\Config\CleanupTimeConfig.cs" />
+        <Compile Include="Backup\Config\BaseConfig.cs" />
+        <Compile Include="Backup\Config\IConfig.cs" />
+        <Compile Include="Backup\Config\InternalConfig.cs" />
+        <Compile Include="Backup\Config\Json\JsonConverters.cs" />
+        <Compile Include="Backup\Config\Json\TShockConfigHandler.cs" />
+        <Compile Include="Backup\Config\StrategyConfig.cs" />
+        <Compile Include="Backup\Config\TimeSpanConfig.cs" />
+        <Compile Include="Backup\Config\WorldSaveTrackingStrategy.cs" />
         <Compile Include="Backup\IBackupService.cs" />
         <Compile Include="Backup\IBackupStrategy.cs" />
         <Compile Include="Logger\DefaultTlog.cs" />
@@ -131,7 +223,6 @@
         <Compile Include="Logger\TLog.cs" />
         <Compile Include="TdiffPlugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
-        <Compile Include="WorldSaveTrackingStrategy.cs" />
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

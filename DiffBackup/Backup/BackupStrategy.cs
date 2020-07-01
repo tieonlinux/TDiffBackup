@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using DiffBackup.Backup.Config;
 using DiffBackup.Logger;
 
 #nullable enable
@@ -9,11 +10,14 @@ namespace DiffBackup.Backup
 {
     public class DefaultBackupStrategy : IBackupStrategy
     {
+        public readonly StrategyConfig Config;
         public readonly ITlog Log;
 
-        public DefaultBackupStrategy(ITlog log)
+        public DefaultBackupStrategy(ITlog log, StrategyConfig config)
         {
             Log = log;
+            Config = config.Clone<StrategyConfig>();
+            Config.SetFromJson(config.ToJson());
             var env = Environment.GetEnvironmentVariables();
 
             // ReSharper disable once InconsistentNaming
@@ -24,17 +28,34 @@ namespace DiffBackup.Backup
                     TimeSpan.FromDays(
                         double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteForceFullBackupTimeSpan)));
             }
+            else
+            {
+                ForceFullBackupTimeSpan = config.EveryXTimeSpanDoFullBackup;
+            }
 
             // ReSharper disable once InconsistentNaming
             const string TdiffOverwriteFillFactor = nameof(TdiffOverwriteFillFactor);
             if (env.Contains(TdiffOverwriteFillFactor))
             {
-                FillFactor = float.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteFillFactor));
+                FillFactor = double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteFillFactor));
+            }
+            else
+            {
+                FillFactor = config.DiffFillFactorToStartFullBackup;
             }
         }
 
-        public TimeSpan ForceFullBackupTimeSpan { get; set; } = TimeSpan.FromDays(7);
-        public float FillFactor { get; set; } = 0.5f;
+        public TimeSpan ForceFullBackupTimeSpan
+        {
+            get => Config.EveryXTimeSpanDoFullBackup;
+            set => Config.EveryXTimeSpanDoFullBackup = value;
+        }
+
+        public double FillFactor
+        {
+            get => Config.DiffFillFactorToStartFullBackup;
+            set => Config.DiffFillFactorToStartFullBackup = value;
+        }
 
         public BackupRepositoryEntry? GetReference(BackupRepository repo, DateTime date)
         {
@@ -97,34 +118,30 @@ namespace DiffBackup.Backup
                 }
             }
 
-            CleanupTimeConfig[] worldCleanupTimeConfigs =
-            {
-                new CleanupTimeConfig("yearly", TimeSpan.FromDays(365.25), TimeSpan.FromDays(3)),
-                new CleanupTimeConfig("monthly", TimeSpan.FromDays(30.44), TimeSpan.FromHours(12)),
-                new CleanupTimeConfig("weekly", TimeSpan.FromDays(7), TimeSpan.FromHours(1))
-            };
 
-            CleanupTimeConfig[] diffCleanupTimeConfigs =
+            foreach (var config in Config.Cleanup.WldFiles)
             {
-                new CleanupTimeConfig("yearly", TimeSpan.FromDays(365.25), TimeSpan.MaxValue),
-                new CleanupTimeConfig("monthly", TimeSpan.FromDays(30.44), TimeSpan.FromMinutes(30)),
-                new CleanupTimeConfig("weekly", TimeSpan.FromDays(7), TimeSpan.FromMinutes(1))
-            };
+                if (config.AgeFilter <= TimeSpan.Zero)
+                {
+                    continue;
+                }
 
-
-            foreach (var config in worldCleanupTimeConfigs)
-            {
                 var marked = ConsumeIEnumerable(MarkOldEntries(backups.Where(backup => !backup.IsDiff),
                     config.AgeFilter,
                     config.KeepBackupEveryTimeSpan));
-                Log.LogDebug($"Marked {marked} entries for {config.Text.ToLower()} wld cleanup");
+                Log.LogDebug($"Marked {marked} entries for {config.Name} wld cleanup");
             }
 
-            foreach (var config in diffCleanupTimeConfigs)
+            foreach (var config in Config.Cleanup.DiffFiles)
             {
+                if (config.AgeFilter <= TimeSpan.Zero)
+                {
+                    continue;
+                }
+
                 var marked = ConsumeIEnumerable(MarkOldEntries(backups.Where(backup => backup.IsDiff), config.AgeFilter,
                     config.KeepBackupEveryTimeSpan));
-                Log.LogDebug($"Marked {marked} entries for {config.Text.ToLower()} diff cleanup");
+                Log.LogDebug($"Marked {marked} entries for {config.Name} diff cleanup");
             }
 
             foreach (var entry in backups.Where(backup => !backup.Valid))
@@ -142,20 +159,6 @@ namespace DiffBackup.Backup
         internal static int ConsumeIEnumerable<T>(IEnumerable<T> enumerable)
         {
             return enumerable.Count();
-        }
-
-        public readonly struct CleanupTimeConfig
-        {
-            public readonly string Text;
-            public readonly TimeSpan AgeFilter;
-            public readonly TimeSpan KeepBackupEveryTimeSpan;
-
-            public CleanupTimeConfig(string text, TimeSpan ageFilter, TimeSpan keepBackupEveryTimeSpan)
-            {
-                Text = text;
-                AgeFilter = ageFilter;
-                KeepBackupEveryTimeSpan = keepBackupEveryTimeSpan;
-            }
         }
     }
 }

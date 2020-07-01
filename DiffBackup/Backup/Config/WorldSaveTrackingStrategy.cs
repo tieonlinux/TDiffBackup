@@ -5,9 +5,9 @@ namespace DiffBackup
     [Flags]
     public enum WorldSaveTrackingStrategy : byte
     {
-        None,
-        FileSystemWatcher,
-        SaveEventListener,
+        None = 0,
+        FileSystemWatcher = 1,
+        SaveEventListener = 1 << 1,
         All = FileSystemWatcher | SaveEventListener
     }
 }

@@ -40,7 +40,7 @@ def submodule_init(name: str, remote_url:str, cwd: OptionalPath='./', version='l
     subprocess.check_call(shlex.split(cmd), cwd=str(cwd / name))
 
 
-def submodule_rename_namespace(name: str, namespaces: Collection[str], cwd: OptionalPath='./', suffix: str='tie'):
+def submodule_rename_namespace(name: str, namespaces: Collection[str], cwd: OptionalPath='./', suffix: str='tie_tdiff'):
     if cwd is None:
         cwd = './'
     cwd: Path = Path(cwd)
@@ -72,7 +72,12 @@ def human_date_parser_init(name: str='HumanDateParser', remote_url="https://gith
     submodule_init(name=name, remote_url=remote_url, version=version)
     submodule_rename_namespace(name=name, namespaces=namespaces)
 
+def json_kit_init(name: str='JsonKit', remote_url="https://github.com/toptensoftware/JsonKit.git", version='b1.1.121', namespaces=('Topten.JsonKit',)):
+    submodule_init(name=name, remote_url=remote_url, version=version)
+    submodule_rename_namespace(name=name, namespaces=namespaces)
+
 if __name__ == "__main__":
     download_tshock()
     deltaq_init()
     human_date_parser_init()
+    json_kit_init()

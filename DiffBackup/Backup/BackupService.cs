@@ -5,7 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using deltaq_tie.BsDiff;
+using deltaq_tie_tdiff.BsDiff;
+using DiffBackup.Backup.Config;
 using DiffBackup.Logger;
 using TShockAPI.Extensions;
 
@@ -16,13 +17,16 @@ namespace DiffBackup.Backup
     public class BackupService : IDisposable, IBackupService
     {
         private readonly SemaphoreSlim _saveDiffSemaphore = new SemaphoreSlim(1, 1);
+        public readonly AllConfig Config;
         public readonly ITlog Log;
         private Stopwatch _saveDiffStopWatch = new Stopwatch();
 
-        public BackupService(ITlog log, IBackupStrategy? strategy = null, BackupIOWorker? worker = null)
+        public BackupService(ITlog log, AllConfig config, IBackupStrategy? strategy = null,
+            BackupIOWorker? worker = null)
         {
             Log = log;
-            Strategy = strategy ?? new DefaultBackupStrategy(Log);
+            Config = config.Clone<AllConfig>();
+            Strategy = strategy ?? new DefaultBackupStrategy(Log, config.Strategy);
             Worker = worker ?? new BackupIOWorker(log);
             var env = Environment.GetEnvironmentVariables();
 
@@ -37,7 +41,11 @@ namespace DiffBackup.Backup
             }
         }
 
-        public TimeSpan ThrottleTimeSpan { get; set; } = TimeSpan.FromMinutes(1);
+        public TimeSpan ThrottleTimeSpan
+        {
+            get => Config.Internal.ThrottleTimeSpan;
+            set => Config.Internal.ThrottleTimeSpan = value;
+        }
 
         public bool ShouldThrottle =>
             ThrottleTimeSpan > TimeSpan.Zero && _saveDiffStopWatch.IsRunning &&
@@ -189,7 +197,11 @@ namespace DiffBackup.Backup
             CancellationToken cancellationToken = default)
         {
             using var timed = new CancellationTokenSource();
-            timed.CancelAfter(TimeSpan.FromMinutes(3));
+            if (Config.Internal.BackupTaskTimeoutTimeSpan > TimeSpan.Zero)
+            {
+                timed.CancelAfter(Config.Internal.BackupTaskTimeoutTimeSpan);
+            }
+
             using var tokenSource =
                 CancellationTokenSource.CreateLinkedTokenSource(Worker.Token, cancellationToken, timed.Token);
             tokenSource.Token.ThrowIfCancellationRequested();

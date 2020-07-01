@@ -5,19 +5,23 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using DiffBackup.Backup;
+using DiffBackup.Backup.Config;
+using DiffBackup.Backup.Config.Json;
 using DiffBackup.Logger;
 using Moq;
 using Xunit;
 
-namespace DiffBackupTests
+namespace DiffBackupTests.Backup
 {
     public class BackupServiceTests : IDisposable
     {
         public BackupServiceTests()
         {
+            JsonConverters.Install();
             _temporaryPath = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_temporaryPath);
             _mockedLog = new Mock<ITlog>(MockBehavior.Loose);
+            _mockedConfig = new Mock<AllConfig>(MockBehavior.Loose){ CallBase = true };
             _worldFile = DownloadWorldFile();
             _worldFileHash = new Lazy<string>(() =>
             {
@@ -38,6 +42,7 @@ namespace DiffBackupTests
         private readonly string _worldFile;
         private readonly Lazy<string> _worldFileHash;
         private readonly Mock<ITlog> _mockedLog;
+        private readonly Mock<AllConfig> _mockedConfig;
         private readonly Random _random = new Random();
 
         private string DownloadWorldFile(
@@ -72,7 +77,7 @@ namespace DiffBackupTests
         {
             var originalHash = _worldFileHash.Value;
             using var cancellationTokenSource = new CancellationTokenSource();
-            using var service = new BackupService(_mockedLog.Object);
+            using var service = new BackupService(_mockedLog.Object, new AllConfig());
             var date = DateTime.Now;
             service.StartBackup(_worldFile, date, cancellationTokenSource.Token).Wait(cancellationTokenSource.Token);
             Assert.True(Directory.Exists(BackupUtils.GetRepoFilePath(_worldFile)));
@@ -105,7 +110,7 @@ namespace DiffBackupTests
         public void TestCreateDiffOnFreshNewRepo()
         {
             var originalHash = _worldFileHash.Value;
-            using var service = new BackupService(_mockedLog.Object);
+            using var service = new BackupService(_mockedLog.Object, new AllConfig());
             var date = DateTime.Now;
             service.StartBackup(_worldFile, date, CancellationToken.None).Wait();
             Assert.True(Directory.Exists(BackupUtils.GetRepoFilePath(_worldFile)));
@@ -131,7 +136,7 @@ namespace DiffBackupTests
         {
             var originalHash = _worldFileHash.Value;
             using var cancellationTokenSource = new CancellationTokenSource();
-            using var service = new BackupService(_mockedLog.Object);
+            using var service = new BackupService(_mockedLog.Object, new AllConfig());
             var date = DateTime.Now;
             var originalDate = date;
             service.StartBackup(_worldFile, date, cancellationTokenSource.Token).Wait(cancellationTokenSource.Token);
@@ -190,7 +195,7 @@ namespace DiffBackupTests
         {
             var originalHash = _worldFileHash.Value;
             using var cancellationTokenSource = new CancellationTokenSource();
-            using var service = new BackupService(_mockedLog.Object);
+            using var service = new BackupService(_mockedLog.Object, new AllConfig());
             var date = DateTime.Now;
             service.StartBackup(_worldFile, date, cancellationTokenSource.Token).Wait(cancellationTokenSource.Token);
             var repo = new BackupRepository(BackupUtils.GetRepoFilePath(_worldFile));

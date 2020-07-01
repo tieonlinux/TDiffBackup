@@ -7,3 +7,6 @@
 [submodule "Base32"]
 	path = Base32
 	url = https://gist.github.com/9335c394c5cc65404c4cf9aceab04143.git
+[submodule "JsonKit"]
+	path = JsonKit
+	url = https://github.com/toptensoftware/JsonKit.git

@@ -2,20 +2,24 @@ using System;
 using System.IO;
 using System.Linq;
 using DiffBackup.Backup;
+using DiffBackup.Backup.Config;
+using DiffBackup.Backup.Config.Json;
 using DiffBackup.Logger;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace DiffBackupTests
+namespace DiffBackupTests.Backup
 {
     public class DefaultBackupStrategyTests : IDisposable
     {
         public DefaultBackupStrategyTests(ITestOutputHelper testOutputHelper)
         {
+            JsonConverters.Install();
             _testOutputHelper = testOutputHelper;
             _temporaryPath = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             _mockedLog = new Mock<ITlog>(MockBehavior.Loose);
+            _mockedConfig = new Mock<StrategyConfig>(MockBehavior.Loose){ CallBase = true };
             Directory.CreateDirectory(_temporaryPath);
         }
 
@@ -30,6 +34,7 @@ namespace DiffBackupTests
         private readonly ITestOutputHelper _testOutputHelper;
         private readonly string _temporaryPath;
         private readonly Mock<ITlog> _mockedLog;
+        private Mock<StrategyConfig> _mockedConfig;
 
 
         private BackupRepository CreateEmptyRepo()
@@ -49,7 +54,7 @@ namespace DiffBackupTests
         [Fact]
         public void TestGetReferenceOnEmptyRepo()
         {
-            var strategy = new DefaultBackupStrategy(_mockedLog.Object);
+            var strategy = new DefaultBackupStrategy(_mockedLog.Object, new StrategyConfig());
             var repo = CreateEmptyRepo();
             Assert.Null(strategy.GetReference(repo, DateTime.Now));
         }
@@ -58,7 +63,7 @@ namespace DiffBackupTests
         public void TestGetReferenceOnOldEntry()
         {
             var fname = $"{Guid.NewGuid():N}.test";
-            var strategy = new DefaultBackupStrategy(_mockedLog.Object);
+            var strategy = new DefaultBackupStrategy(_mockedLog.Object, new StrategyConfig());
             var dateTime = DateTime.Now;
             var repo = CreateRepoWithOldEntry(dateTime - strategy.ForceFullBackupTimeSpan, fname);
             Assert.Null(strategy.GetReference(repo, dateTime));
@@ -69,7 +74,7 @@ namespace DiffBackupTests
         {
             var dateTime = DateTime.Now;
             var fname = BackupUtils.FormatWorldFileName(dateTime, Guid.NewGuid().ToString("N"));
-            var strategy = new DefaultBackupStrategy(_mockedLog.Object);
+            var strategy = new DefaultBackupStrategy(_mockedLog.Object, new StrategyConfig());
             var repo = CreateRepoWithOldEntry(dateTime, fname);
             var res = strategy.GetReference(repo, dateTime);
             Assert.NotNull(res);
@@ -110,7 +115,7 @@ namespace DiffBackupTests
                 }
             }
 
-            var strategy = new DefaultBackupStrategy(_mockedLog.Object);
+            var strategy = new DefaultBackupStrategy(_mockedLog.Object, new StrategyConfig());
 
             var res = strategy.ListExpiredEntries(repo, dateTime);
             _testOutputHelper.WriteLine(res.ToString());

@@ -4,7 +4,7 @@ using TerrariaApi.Server;
 namespace DiffBackup.Logger
 {
     // ReSharper disable once InconsistentNaming
-    public class TLog : DefaultTlog
+    public class TLog : BaseTlog
     {
         private readonly TerrariaPlugin _plugin;
 

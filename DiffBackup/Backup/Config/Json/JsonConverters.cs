@@ -1,6 +1,7 @@
 ﻿using System;
 using Topten.JsonKit_tie_tdiff;
 
+#nullable enable
 namespace DiffBackup.Backup.Config.Json
 {
     public static class JsonConverters
@@ -42,13 +43,12 @@ namespace DiffBackup.Backup.Config.Json
 
         private static TimeSpanConfig TimeSpanParseJson(object literal)
         {
-            var res = TimeSpan.ParseExact((string) literal, TimeSpanFormatString, null);
-            return res;
+            return TimeSpanConfig.ParseJson(literal.ToString());
         }
 
         private static void WriteJson(IJsonWriter writer, TimeSpanConfig value)
         {
-            writer.WriteStringLiteral($"{value.Value.ToString(TimeSpanFormatString)}");
+            writer.WriteStringLiteral(value.FormatJson());
         }
 
         private static void WriteJson(IJsonWriter writer, WorldSaveTrackingStrategy value)

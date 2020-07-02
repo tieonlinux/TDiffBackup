@@ -2,7 +2,7 @@
 
 namespace DiffBackup.Logger
 {
-    public abstract class DefaultTlog : ITlog
+    public abstract class BaseTlog : ITlog
     {
         public abstract void LogWriteLine(string text, TraceLevel level);
 

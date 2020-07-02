@@ -9,6 +9,6 @@ namespace DiffBackup.Backup.Config
         public TimeSpanConfig BackupTaskTimeoutTimeSpan { get; set; } = TimeSpan.FromMinutes(3);
 
         public WorldSaveTrackingStrategy WorldSaveTrackingStrategy { get; set; } =
-            WorldSaveTrackingStrategy.SaveEventListener;
+            WorldSaveTrackingStrategy.Default;
     }
 }

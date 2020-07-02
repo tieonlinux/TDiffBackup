@@ -11,9 +11,9 @@ Terraria TShock World file backup system
 
 ## Commands
 ```
-/tdiff <date>    | restore wld backup at <date>
-/tdiff ls        | list most recent backups
-/tdiff ls <date> | list backups close to given date
+/tdiff restore <date>  | restore wld backup at <date>
+/tdiff ls              | list most recent backups
+/tdiff ls <date>       | list backups close to given date
 ```
 
 ## Permissions
@@ -25,8 +25,6 @@ tdiff    | allow user/group to issue tdiff commands
 - This plugin **only** backup the serving *wld* file. **No backup is made for sqlite, json, etc... tshock related files**. Ie if you use SSC you should backup the sqlite *db* files on your own.
 - In order to restore a backup the server shuts off and one has to restart it.
 
-## TODOs
-- As of now no backup cleanup logic implemented. The backup folder's size keep growing up (slowly thanks to the diff algorithm).
 
 ## How it work
 
@@ -91,5 +89,5 @@ assuming there's at **least 1 backup**:
 1. `copy` any *wld* file found in the backup folder to the *worlds folder*
 2. `rename` the copied file as the **exact** original *wld* file name.
 3. `start` tshock with the copied file (the world may be in a really old version that's not important for now)
-4. use `/tdiff <date>` commands to restore the backup you want
+4. use `/tdiff restore <date>` commands to restore the backup you want
 5. `restart` tshock

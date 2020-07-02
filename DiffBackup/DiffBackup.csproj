@@ -217,7 +217,7 @@
         <Compile Include="Backup\Config\WorldSaveTrackingStrategy.cs" />
         <Compile Include="Backup\IBackupService.cs" />
         <Compile Include="Backup\IBackupStrategy.cs" />
-        <Compile Include="Logger\DefaultTlog.cs" />
+        <Compile Include="Logger\BaseTlog.cs" />
         <Compile Include="Logger\ITlog.cs" />
         <Compile Include="Logger\LoggingExt.cs" />
         <Compile Include="Logger\TLog.cs" />

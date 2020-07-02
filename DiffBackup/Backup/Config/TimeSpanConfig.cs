@@ -24,7 +24,7 @@ namespace DiffBackup.Backup.Config
 
         public string FormatJson()
         {
-            return $"{Value.ToString(JsonConverters.TimeSpanFormatString)}";
+            return Value.ToString(JsonConverters.TimeSpanFormatString);
         }
 
         public static TimeSpanConfig ParseJson(string literal)

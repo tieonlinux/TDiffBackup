@@ -17,7 +17,6 @@ namespace DiffBackup.Backup
         {
             Log = log;
             Config = config.Clone<StrategyConfig>();
-            Config.SetFromJson(config.ToJson());
             var env = Environment.GetEnvironmentVariables();
 
             // ReSharper disable once InconsistentNaming
@@ -28,20 +27,12 @@ namespace DiffBackup.Backup
                     TimeSpan.FromDays(
                         double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteForceFullBackupTimeSpan)));
             }
-            else
-            {
-                ForceFullBackupTimeSpan = config.EveryXTimeSpanDoFullBackup;
-            }
 
             // ReSharper disable once InconsistentNaming
             const string TdiffOverwriteFillFactor = nameof(TdiffOverwriteFillFactor);
             if (env.Contains(TdiffOverwriteFillFactor))
             {
                 FillFactor = double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteFillFactor));
-            }
-            else
-            {
-                FillFactor = config.DiffFillFactorToStartFullBackup;
             }
         }
 

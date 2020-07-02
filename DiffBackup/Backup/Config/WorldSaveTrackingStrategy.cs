@@ -8,6 +8,7 @@ namespace DiffBackup
         None = 0,
         FileSystemWatcher = 1,
         SaveEventListener = 1 << 1,
-        All = FileSystemWatcher | SaveEventListener
+        All = FileSystemWatcher | SaveEventListener,
+        Default = SaveEventListener
     }
 }

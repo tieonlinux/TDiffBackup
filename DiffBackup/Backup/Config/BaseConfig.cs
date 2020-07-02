@@ -23,8 +23,9 @@ namespace DiffBackup.Backup.Config
         {
             if (this is T t)
             {
-                return Topten.JsonKit_tie_tdiff.Json.Clone<T>(t);
+                return Topten.JsonKit_tie_tdiff.Json.Clone(t);
             }
+
             throw new TypeAccessException();
         }
 

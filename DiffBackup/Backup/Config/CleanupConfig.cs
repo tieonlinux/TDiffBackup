@@ -5,6 +5,8 @@ namespace DiffBackup.Backup.Config
 {
     public class CleanupConfig : BaseConfig
     {
+        public TimeSpanConfig ScheduleTimeSpan { get; set; } = TimeSpan.FromHours(12);
+
         public List<CleanupTimeConfig> WldFiles { get; set; } = new List<CleanupTimeConfig>
         {
             new CleanupTimeConfig("yearly", TimeSpan.FromDays(365), TimeSpan.FromDays(3)),

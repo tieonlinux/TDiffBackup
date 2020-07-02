@@ -211,7 +211,7 @@ namespace DiffBackup
                     return;
                 }
 
-                Task.Factory.StartNew(async () =>
+                Task.Run(async () =>
                 {
                     await _backupService.StartCleanup(Main.worldPathName).ContinueWith(task =>
                     {
@@ -409,7 +409,7 @@ namespace DiffBackup
                 await _backupService.StartBackup(e.FullPath, now);
             }
 
-            Task.Factory.StartNew(async () => await RecheckLaterAsync());
+            Task.Run(RecheckLaterAsync);
         }
     }
 }

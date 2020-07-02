@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using deltaq_tie_tdiff.BsDiff;
 using DiffBackup.Backup.Config;
 using DiffBackup.Logger;
+using Terraria;
 using TShockAPI.Extensions;
 
 #nullable enable
@@ -16,10 +17,12 @@ namespace DiffBackup.Backup
 {
     public class BackupService : IDisposable, IBackupService
     {
+        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private readonly SemaphoreSlim _saveDiffSemaphore = new SemaphoreSlim(1, 1);
         public readonly AllConfig Config;
         public readonly ITlog Log;
         private Stopwatch _saveDiffStopWatch = new Stopwatch();
+        private readonly Stopwatch _scheduledCleanupStopWatch = Stopwatch.StartNew();
 
         public BackupService(ITlog log, AllConfig config, IBackupStrategy? strategy = null,
             BackupIOWorker? worker = null)
@@ -39,6 +42,9 @@ namespace DiffBackup.Backup
                     TimeSpan.FromSeconds(
                         double.Parse(Environment.GetEnvironmentVariable(TdiffOverwriteThrottleTimeSpan)));
             }
+
+            Task.Factory.StartNew(CleanupScheduleLoop, _cancellationTokenSource.Token,
+                TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
         }
 
         public TimeSpan ThrottleTimeSpan
@@ -65,26 +71,30 @@ namespace DiffBackup.Backup
         public async Task<IList<BackupRepositoryEntry>> StartCleanup(string worldPath,
             CancellationToken cancellationToken = default)
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
+                _cancellationTokenSource.Token);
             var repo = new BackupRepository(BackupUtils.GetRepoFilePath(Path.GetFullPath(worldPath)));
-            return await Worker.IoScheduleFunction(() => Cleanup(repo), cancellationToken);
+            return await Worker.IoScheduleFunction(() => Cleanup(repo), cts.Token);
         }
 
 
         public List<DateTime> ListBackup(string path, CancellationToken cancellationToken)
         {
-            IEnumerable<DateTime> ListDate()
+            async Task<List<DateTime>> ListDate()
             {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
+                    _cancellationTokenSource.Token);
                 var repo = new BackupRepository(BackupUtils.GetRepoFilePath(path));
                 cancellationToken.ThrowIfCancellationRequested();
-                foreach (var entry in BackupUtils.ListBackup(repo.Entries))
-                {
-                    yield return entry.DateTime;
-                }
+                var entries =
+                    await Worker.IoScheduleFunction(() => BackupUtils.ListBackup(repo.Entries).ToList(), cts.Token);
+                return entries.Select(entry => entry.DateTime).ToList();
             }
 
             try
             {
-                return ListDate().ToList();
+                var task = Task.Run(ListDate, cancellationToken);
+                return task.Result;
             }
             catch (FileNotFoundException)
             {
@@ -92,8 +102,58 @@ namespace DiffBackup.Backup
             }
         }
 
-
         public bool Restore(string path, DateTime date, CancellationToken cancellationToken)
+        {
+            var res = Task.Run(
+                async () => await Worker.IoScheduleFunction(() => DoRestore(path, date, cancellationToken),
+                    cancellationToken), cancellationToken);
+            return res.Result;
+        }
+
+        public void Dispose()
+        {
+            Log.LogDebug($"{nameof(BackupService)} Dispose");
+            Worker.Dispose();
+            _saveDiffSemaphore.Dispose();
+            Strategy.Dispose();
+            _cancellationTokenSource.Cancel(false);
+        }
+
+        private async Task CleanupScheduleLoop()
+        {
+            var cancellationToken = _cancellationTokenSource.Token;
+            if (Config.Strategy.Cleanup.ScheduleTimeSpan <= TimeSpan.Zero)
+            {
+                Log.LogDebug("CleanupScheduleLoop no need to run");
+                return;
+            }
+
+            var random = new Random();
+            await Task.Delay(TimeSpan.FromSeconds(random.NextDouble() * 60), cancellationToken);
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (_scheduledCleanupStopWatch.Elapsed >= Config.Strategy.Cleanup.ScheduleTimeSpan)
+                    {
+                        await StartCleanup(Main.WorldPath, cancellationToken);
+                        _scheduledCleanupStopWatch.Restart();
+                    }
+
+                    await Task.Delay(
+                        Config.Strategy.Cleanup.ScheduleTimeSpan + TimeSpan.FromSeconds(random.NextDouble() * 60),
+                        cancellationToken);
+                }
+            }
+            catch (OperationCanceledException e)
+            {
+                Log.LogDebug("Loop cancelled");
+                Log.LogDebug(e.BuildExceptionString(), TraceLevel.Error);
+            }
+        }
+
+        private bool DoRestore(string path, DateTime date, CancellationToken cancellationToken)
         {
             var repo = new BackupRepository(BackupUtils.GetRepoFilePath(path));
             cancellationToken.ThrowIfCancellationRequested();
@@ -134,14 +194,6 @@ namespace DiffBackup.Backup
                 buff.CopyTo(fs);
                 return true;
             }
-        }
-
-        public void Dispose()
-        {
-            Log.LogDebug($"{nameof(BackupService)} Dispose");
-            Worker.Dispose();
-            _saveDiffSemaphore.Dispose();
-            Strategy.Dispose();
         }
 
         private IList<BackupRepositoryEntry> Cleanup(BackupRepository repo)
@@ -203,12 +255,14 @@ namespace DiffBackup.Backup
             }
 
             using var tokenSource =
-                CancellationTokenSource.CreateLinkedTokenSource(Worker.Token, cancellationToken, timed.Token);
+                CancellationTokenSource.CreateLinkedTokenSource(Worker.Token, cancellationToken, timed.Token,
+                    _cancellationTokenSource.Token);
             tokenSource.Token.ThrowIfCancellationRequested();
             await _saveDiffSemaphore.WaitAsync(tokenSource.Token);
 
             async Task<T> IoSchedule<T>(Func<T> func)
             {
+                // ReSharper disable once AccessToDisposedClosure
                 return await IoScheduleFunction(func, tokenSource!.Token);
             }
 
